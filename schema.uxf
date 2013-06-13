@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="11.2">
+  <zoom_level>10</zoom_level>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>20</x>
+      <y>240</y>
+      <w>160</w>
+      <h>240</h>
+    </coordinates>
+    <panel_attributes>_pod: resource_
+--
+pod: topic
+number: time
+url: url
+bool: is_pertinent
+pod: author
+pod: source
+multiple: context
+multiple: is_correct
+multiple: comments
+number: facebook
+number: twitter
+number: linkedin
+number: gplus
+bg=green</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>40</y>
+      <w>200</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>_pod taxonomy: topic_
+--
+text: name
+url: gAlertFeed
+time: lastChecked
+bg=green</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>150</x>
+      <y>30</y>
+      <w>270</w>
+      <h>260</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>250;30;30;240</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>380</y>
+      <w>200</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>_multiple: context_
+--
+0: preconcezionale
+1: gravidanza
+bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>150</x>
+      <y>340</y>
+      <w>270</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>250;60;30;30</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>590</y>
+      <w>200</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>_multiple: comments_
+--
+0: non possibili
+1: assenti
+2: presenti
+bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>150</x>
+      <y>380</y>
+      <w>270</w>
+      <h>250</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>250;230;30;30</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>140</y>
+      <w>200</w>
+      <h>100</h>
+    </coordinates>
+    <panel_attributes>_pod: author_
+--
+text: name
+text: author_urls
+bool: is_professionist
+pod: resources
+bg=green</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>150</x>
+      <y>130</y>
+      <w>270</w>
+      <h>230</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>250;30;30;210</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>480</y>
+      <w>200</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>_multiple: is_correct_
+--
+0: Per niente
+1: In parte
+2: Totalmente
+bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>400</x>
+      <y>260</y>
+      <w>200</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>_pod: source_
+--
+text: name
+url: url
+multiple: type
+multiple: specialization
+pod: resources
+bg=green</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>150</x>
+      <y>250</y>
+      <w>270</w>
+      <h>120</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>250;30;30;100</additional_attributes>
+  </element>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>750</x>
+      <y>320</y>
+      <w>200</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>_multiple: specialization_
+--
+0: generalista
+1: specializzata
+2: scientifica
+bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <type>com.umlet.element.Relation</type>
+    <coordinates>
+      <x>570</x>
+      <y>310</y>
+      <w>200</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>180;30;30;30</additional_attributes>
+  </element>
+</diagram>
