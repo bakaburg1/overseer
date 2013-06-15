@@ -18,9 +18,21 @@ function opbg_fetch_new_resources(){
 			$feed_urls = array_map('trim', $feed_urls);
 
 			foreach($feed_urls as $feed_url):
-				if (is_string($feed_url)):
-					
-				endif;
+
+				$not_last_page = true;
+
+				$url_query = '?'.http_build_query(array('n' => $entries_per_page));
+
+				while($not_last_page):
+
+					$feed   = file_get_contents($feed_url.$url_query);
+
+					$xml	= simplexml_load_string($feed);
+
+					if ($xml):
+						
+					endif;
+				endwhile;
 			endforeach;
 		endwhile;
 	endif;
