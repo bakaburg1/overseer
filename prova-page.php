@@ -9,23 +9,19 @@
 
 get_header();
 
-$prova = pods('prove', 1);
+$new_resources = 0;
 
-//echo $prova->total();
+$feed_xml = false;
 
-//sism_debug($prova->row());
+$topics = pods('topics', array('limit' => -1));
 
-$data = array(
-	'name' => 'New book name',
-	'description' => 'Awesome book, read worthy!'
-);
-sism_debug($prova->row());
-//sism_debug($prova->add(array('name' => 'nuovo', 'field' => 'capo')));
-while ($prova->fetch()){
+if ($topics->total() > 0):
+	while ($topics->fetch()):
+		$feeds = $topics->field('feeds.url');
+		$feeds = array_map('trim', $feeds);
+	endwhile;
+endif;
 
-}
-
-//sism_debug(json_encode($prova));
 
 
 get_footer(); ?>
