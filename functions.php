@@ -29,16 +29,20 @@ function opbg_sanitize_host_url($pieces, $is_new, $id){
 
 function opbg_fetch_new_resources(){
 
-	$entries_per_page = 1000;
+	/* Setup */
+	$entries_per_page	= 1000;
 
-	$topics = pods('topics', array('limit' => -1));
+	$url_query			= '?'.http_build_query(array('n' => $entries_per_page));
 
-	$sources = pods('sources');
+	$topics 			= pods('topics', array('limit' => -1));
 
-	$resources = pods('prove');
+	$sources 			= pods('sources');
 
-	$new_results = array();
+	$resources 			= pods('prove');
 
+	$new_results 		= array();
+
+	/* Topics Loop */
 	if ($topics->total() > 0):
 		while ($topics->fetch()):
 			$feeds = $topics->field('feeds');
@@ -47,107 +51,113 @@ function opbg_fetch_new_resources(){
 
 			$new_results[$topic_id] = 0;
 
+			/* Feeds Loop */
 			foreach($feeds as $feed):
 
-				$feed = (object)$feed;
+				$feed 			= (object)$feed;
 
-				$feed_id = $feed->id;
+				$feed_id 		= $feed->id;
 
-				$not_last_page = true;
+				$feed_content   = file_get_contents($feed->url.$url_query);
 
-				$url_query = '?'.http_build_query(array('n' => $entries_per_page));
+				$xml			= simplexml_load_string($feed_content);
 
-				$feed_entries = array();
+				if ($xml):
 
-				while($not_last_page):
+					/* Entries Loop */
+					foreach($xml->entry as $entry):
 
-					$feed_content   = file_get_contents($feed->url.$url_query);
+						/* Exit foreach if entry older than last check */
 
-					$xml	= simplexml_load_string($feed_content);
+						$entry_pub_time = date_create($entry->published);
 
-					if ($xml):
+						if ($entry_pub_time < date_create($feed->last_check)):
+							break;
+						endif;
 
-						foreach($xml->entry as $entry):
+						/* Fetching monodimensional data from entry */
 
-							/* Exit foreach if entry older than last check */
+						$entry_data = array();
 
-							$entry_pub_time = date_create($entry->published);
+						$entry_url = array();
 
-							if ($entry_pub_time < date_create($feed->last_check)):
-								break;
-							endif;
+						// If no url is present go to next entry
+						if (!preg_match('/&q=(.*)&ct/', $entry->link->attributes()->href, $entry_url)){
+							continue;
+						}
 
-							/* Fetching monodimensional data from entry */
+						$entry_data['pub_time'] = $entry_pub_time->format('Y-m-d H:i:s');
 
-							$entry_data = array();
+						$entry_data['url'] = urldecode($entry_url[1]);
 
-							$entry_url = array();
+						$entry_data['title'] = $entry->title;
 
-							// If no url is present go to next entry
-							if (!preg_match('/&q=(.*)&ct/', $entry->link->attributes()->href, $entry_url)){
-								continue;
-							}
+						$entry_data['feeds'] = $feed_id;
 
-							$entry_data['pub_time'] = $entry_pub_time->format('Y-m-d H:i:s');
+						$entry_data['topics'] = $topic_id;
 
-							$entry_data['url'] = urldecode($entry_url[1]);
+						/* Checking if resource and source are already existing */
+						$parsed_url = parse_url($entry_data['url']);
 
-							$entry_data['title'] = $entry->title;
+						$sources->find(array('limit' => 1, 'where' => array('t.url' => $parsed_url['host'])));
 
-							$entry_data['feeds'] = $feed_id;
+						// If source already exist, check if resource exist
+						if ($sources->total() > 0):
+							$resources->find(array('limit' => 1, 'where' => array('t.resource_url' => $entry_data['url'])));
 
-							$entry_data['topics'] = $topic_id;
+							$source_id = $sources->id();
 
-							/* Checking if resource and source are already existing */
+							// If resource already exist, check if it had this topic already. If not add it
+							if ($resources->total() > 0):
 
-							$parsed_url = parse_url($entry_data['url']);
+								$resource_topics = $resources->field('topics.id') ? $resources->field('topics.id') : array();
 
-							$sources->find(array('limit' => 1, 'where' => array('t.url' => $parsed_url['host'])));
-
-							// If source already exist, check if resource exist
-							if ($sources->total() > 0):
-								$resources->find(array('limit' => 1, 'where' => array('t.resource_url' => $entry_data['url'])));
-
-								$source_id = $sources->field('id');
-
-								// If resource already exist, check if it had this topic already. If not add it
-								if ($resources->total() > 0):
-
-									$resource_topics = $resources->field('topics.id') ? $resources->field('topics.id') : array();
-
-									if (!in_array($topic_id, $resource_topics)):
-										$resource_topics[] = $topic_id;
-										$resources->save('topic', $resource_topics);
-									endif;
-
-									$resource_feeds = $resources->field('feeds.id') ? $resources->field('feeds.id') : array();
-
-									if (!in_array($feed_id, $resource_feeds)):
-										$resource_feeds[] = $feed_id;
-										$resources->save('feeds', $resource_feeds);
-									endif;
-
-									continue;
+								if (!in_array($topic_id, $resource_topics)):
+									$resource_topics[] = $topic_id;
+									$resources->save('topic', $resource_topics);
 								endif;
-							else:
-								// If source doesn't exist, create a new one
-								$source_id = $sources->add(array('url' => $parsed_url['host']));
+
+								$resource_feeds = $resources->field('feeds.id') ? $resources->field('feeds.id') : array();
+
+								if (!in_array($feed_id, $resource_feeds)):
+									$resource_feeds[] = $feed_id;
+									$resources->save('feeds', $resource_feeds);
+								endif;
+
+								continue;
 							endif;
+						else:
+							// If source doesn't exist, create a new one
+							$source_id = $sources->add(array('url' => $parsed_url['host']));
+						endif;
 
-							/* Save new entry */
+						/* Save new entry */
 
-							$entry_data['sources'] = $source_id;
+						$entry_data['sources'] = $source_id;
 
-							$resources->add();
+						$resources->add($entry_data);
 
-							$new_results[$topic_id]++;
+						$last_update = $entry_data['pub_time'];
 
-						endforeach;
+						$new_results[$topic_id]++;
+					endforeach;
 
-					endif;
-				endwhile;
+					pods('feeds', $feed_id)->save('last_check', $last_update);
+				endif;
 			endforeach;
 		endwhile;
+
+		$new_results['total'] = 0;
+
+		foreach ($new_results as $topic_results):
+			$new_results['total_new'] += $topic_results;
+		endforeach;
+
+		header( "Content-Type: application/json" );
+
+		echo json_encode($new_results);
+
+		exit;
 	endif;
 }
 
