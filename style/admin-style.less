@@ -6,7 +6,7 @@
 
 @widget-blue: #21759B;
 
-.dashboard-widgets-wrap{
+#dashboard-widgets-wrap{
 	.postbox {
 		font-family: "helvetica neue", sans-serif;
 		font-size: 1rem;
@@ -18,52 +18,78 @@
 			line-height: 1.5;
 		}
 	}
-	.bootstrap-wpadmin {
-		 hr {
-			margin: 10px 0;
-		}
-		.status-table {
-			.row-fluid [class*="span"] {
-				margin-left: 0;
-				.carved-text;
-			}
-			.status-header {
-				padding: 6px 0 0px;
-				color: #8F8F8F;
-				font-size: 16px;
-			}
-			.separator.span12 {
-				min-height: 0%;
-				border-top: 1px solid #AAA;
-				border-bottom: 1px solid #FFF;
-				margin-bottom: 0.7rem;
-			}
-			.grid-dummy-first.span12 {
-				min-height: 0%;
-			}
-			.value {
-				font-size: 18px;
-				text-align: right;
-				font-family: Georgia,"Times New Roman","Bitstream Charter",Times,serif;
-				&.status-new {
-					color: green;
-				}
-				&.status-cat {
-					color: orange;
-				}
-				&.status-excluded {
-					color: red;
-				}
-				&.status-total {
-					color: @widget-blue
-				}
-			}
-			.key {
-				color: #21759B;
-				font-size: 15px;
-				color: @widget-blue;
-			}
-		}
+}
+.bootstrap-wpadmin {
+	 hr {
+		margin: 10px 0;
 	}
 }
 
+#dashboard_summary {
+	.fetched-results{
+		.carved-text;
+		color: #8F8F8F;
+		font-weight: lighter;
+		text-align: center;
+		padding-top: 0.4rem;
+		display: none;
+		.icon-remove-sign {
+			margin-left: 0.3rem;
+			padding-top: 0.14rem;
+		}
+		span {
+			color: green;
+			font-weight: bold;
+		}
+	}
+	.status-table {
+		.row-fluid [class*="span"] {
+			margin-left: 0;
+			.carved-text;
+		}
+		.status-header {
+			color: #8F8F8F;
+			font-size: 19px;
+			font-weight: lighter;
+		}
+		.status-view-toggle {
+			.btn-group{
+				float: right;
+			}
+			button {
+				width: 1.5rem;
+			}
+		}
+		.separator.span12 {
+			min-height: 0%;
+			border-top: 1px solid #AAA;
+			border-bottom: 1px solid #FFF;
+			margin-bottom: 0.7rem;
+		}
+		.grid-dummy-first.span12 {
+			min-height: 0%;
+		}
+		.value {
+			font-size: 18px;
+			text-align: right;
+			font-family: Georgia,"Times New Roman","Bitstream Charter",Times,serif;
+			&.status-new {
+				color: green;
+			}
+			&.status-categorized {
+				color: orange;
+			}
+			&.status-excluded {
+				color: red;
+			}
+			&.status-total {
+				color: @widget-blue
+			}
+		}
+		.key {
+			color: #21759B;
+			font-size: 15px;
+			color: @widget-blue;
+		}
+	}
+}
