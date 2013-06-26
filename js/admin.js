@@ -7,7 +7,8 @@ function opbg_dashboard_summary_print_status_values(){
 		var $this = $(this);
 		var new_val;
 		if (mode == '%'){
-			new_val = ($this.data('status-value') / dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') * 100) + '%';
+			new_val = Math.round( ($this.data('status-value') / dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') * 1000) ) * 10;
+			new_val += '%';
 		}
 		else {
 			new_val = $this.data('status-value');
