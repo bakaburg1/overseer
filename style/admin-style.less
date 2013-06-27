@@ -1,7 +1,7 @@
 /**** Mixins ****/
 
 .carved-text {
-	text-shadow: #FFF 0 1px 0;
+	text-shadow: 0px 1px 0px #FFF, 0px 1px 0px #FFF;
 }
 
 @widget-blue: #21759B;
@@ -19,6 +19,40 @@
 		}
 	}
 }
+
+#adminmenu {
+	.carved-text;
+
+	li.menu-top div.wp-menu-image{
+		background-image: none;
+		text-align: center;
+		height: 100%;
+		font-size: 1.1rem;
+		padding-top: 4px;
+
+		:hover {
+			color: #D54E21;
+		}
+	}
+
+	.menu-icon-users {
+		display: none;
+	}
+}
+
+.wrap {
+	#icon-index, #icon-edit-pages{
+		font-size: 38px;
+		background-image: none;
+		padding-left: 1px;
+		color: @widget-blue;
+	}
+	h2 {
+		color: @widget-blue !important;
+	}
+
+}
+
 .bootstrap-wpadmin {
 	 hr {
 		margin: 10px 0;
@@ -58,6 +92,9 @@
 			}
 			button {
 				width: 1.5rem;
+				font-weight: bold;
+				font-family: 'helvetica neue', sans-serif;
+				font-size: 13px;
 			}
 		}
 		.separator.span12 {
@@ -70,7 +107,7 @@
 			min-height: 0%;
 		}
 		.value {
-			font-size: 18px;
+			font-size: 22px;
 			text-align: right;
 			font-family: Georgia,"Times New Roman","Bitstream Charter",Times,serif;
 			&.status-new {
@@ -88,7 +125,7 @@
 		}
 		.key {
 			color: #21759B;
-			font-size: 15px;
+			font-size: 17px;
 			color: @widget-blue;
 		}
 	}
