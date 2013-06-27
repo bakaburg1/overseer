@@ -1,35 +1,58 @@
-function opbg_dashboard_summary_print_status_values(){
-	$ = jQuery;
-
-	mode = dashboard_summary_widget.find('.status-view-toggle button.active').data('toggle-option');
-
-	dashboard_summary_widget.find('.status-table .value').each(function(){
-		var $this = $(this);
-		var new_val;
-		if (mode == '%'){
-			new_val = Math.round( ($this.data('status-value') / dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') * 1000) ) * 10;
-			new_val += '%';
-		}
-		else {
-			new_val = $this.data('status-value');
-		}
-
-		$this.text(new_val);
-	})
-}
-
-function opbg_dashboard_summary_upgrade_status_values(data){
-	for (var status in data){
-		dashboard_summary_widget.find('.status-table .value.status-' + status).data('status-value', data[status])
-	}
-	opbg_dashboard_summary_print_status_values();
-}
-
 jQuery(document).ready(function( $ ) {
+
+	window.opbg = {};
+
+	opbg.dashboard_summary_print_status_values = function(){
+
+		mode = dashboard_summary_widget.find('.status-view-toggle button.active').data('toggle-option');
+
+		dashboard_summary_widget.find('.status-table .value').each(function(){
+			var $this = $(this);
+			var new_val;
+			if (mode == '%'){
+				new_val = Math.round( ($this.data('status-value') / dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') * 1000) ) / 10;
+				new_val += '%';
+			}
+			else {
+				new_val = $this.data('status-value');
+			}
+
+			$this.text(new_val);
+		})
+	}
+
+	opbg.dashboard_summary_upgrade_status_values = function(data){
+		for (var status in data){
+			dashboard_summary_widget.find('.status-table .value.status-' + status).data('status-value', data[status])
+		}
+		opbg.dashboard_summary_print_status_values();
+	}
+
+	opbg.set_admin_menu_icons = function (){
+		var adminmenu	= $('#adminmenu');
+		var pods_icons = {
+			'authors':		'icon-user',
+			'feeds':		'icon-rss',
+			'resources':	'icon-compass',
+			'sources':		'icon-globe',
+			'topics':		'icon-folder-open'
+		};
+		for (var pods in pods_icons){
+			adminmenu.find('.menu-icon-generic.toplevel_page_pods-manage-' + pods + ' .wp-menu-image').addClass(pods_icons[pods]);
+			$('body.toplevel_page_pods-manage-' + pods + ' #icon-edit-pages').addClass(pods_icons[pods]);
+		}
+
+		adminmenu.find('.menu-icon-dashboard .wp-menu-image').addClass('icon-home');
+
+		$('.wrap #icon-index').addClass('icon-home');
+	}
+
 
 	window.dashboard_summary_widget = $('#dashboard_summary');
 
-	opbg_dashboard_summary_print_status_values();
+	opbg.dashboard_summary_print_status_values();
+
+	opbg.set_admin_menu_icons();
 
 	$(".bootstrap-wpadmin .btn-group[data-toggle='buttons-radio'] button").on('click.button-toggle-radio', function(){
 		console.log(this);
@@ -39,7 +62,7 @@ jQuery(document).ready(function( $ ) {
 
 			var $callback = $this.parent().data('toggle-function');
 
-			window[$callback]();
+			opbg[$callback]();
 		}
 	})
 
@@ -55,8 +78,6 @@ jQuery(document).ready(function( $ ) {
 		var nonce 				= $this.data('nonce');
 		var old_html 			= $this.html();
 		var loading_text 		= $this.data('loading-text');
-		var loading_dots_count 	= 1;
-		var loading_dots 		= '.';
 		var fetched_results 	= dashboard_summary_widget.find('.fetched-results');
 
 		$this.addClass('disabled');
@@ -72,9 +93,9 @@ jQuery(document).ready(function( $ ) {
 				window.ajaxRes = response;
 				if (response.success == true) {
 					if (response.new_results > 0){
-						fetched_results.html('<span>' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found!');
+						fetched_results.html('<span>' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found in ' + response.duration + '!');
 
-						opbg_dashboard_summary_upgrade_status_values(response.summary);
+						opbg.dashboard_summary_upgrade_status_values(response.summary);
 					}
 					else {
 						fetched_results.text('Sorry! There were no new resources.');
@@ -84,7 +105,8 @@ jQuery(document).ready(function( $ ) {
 					fetched_results.text('Some server error occurred...');
 				}
 			},
-			error:		function(){
+			error:		function(response){
+				window.ajaxRes = response;
 				fetched_results.text('Some connection error occurred...');
 			},
 			complete:	function(response){
