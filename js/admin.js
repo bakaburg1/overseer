@@ -88,8 +88,7 @@ jQuery(document).ready(function( $ ) {
 		$.ajax({
 			type: 		"post",
 			url: 		ajaxurl,
-			data: 		{action: "fetch_new_resources", nonce: nonce},
-			success: 	function(response) {
+			done: 	function(response) {
 				window.ajaxRes = response;
 				if (response.success == true) {
 					if (response.new_results > 0){
@@ -105,11 +104,11 @@ jQuery(document).ready(function( $ ) {
 					fetched_results.text('Some server error occurred...');
 				}
 			},
-			error:		function(response){
+			fail:		function(response){
 				window.ajaxRes = response;
 				fetched_results.text('Some connection error occurred...');
 			},
-			complete:	function(response){
+			always:	function(response){
 				fetched_results.append($('<i>').addClass('icon-remove-sign')).fadeIn(200);
 				$this.removeClass('disabled').html(old_html);
 			}
