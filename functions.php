@@ -35,12 +35,12 @@ add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, 
 // Redirect user to wp-admin
 add_action( 'init', function () {
 	add_action( 'template_redirect', function(){
-		//if(!is_admin()) wp_redirect();
+		if(!is_admin()) wp_redirect();
 	}, 10);
 }, 10 );
 
 add_filter( 'login_redirect', function($redirect_to, $request, $user){
-	return admin_url();
+	return admin_url().'index.php';
 }, 10, 3);
 
 /* Css and javascript includes */
