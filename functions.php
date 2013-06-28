@@ -10,7 +10,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
 bk1_debug::state_set('off');
-//bk1_debug::print_always_set('on');
+//bk1_debug::print_always_set('off');
 
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
 add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
@@ -40,7 +40,7 @@ add_action( 'init', function () {
 }, 10 );
 
 add_filter( 'login_redirect', function($redirect_to, $request, $user){
-	return admin_url().'index.php';
+	//return admin_url().'index.php';
 }, 10, 3);
 
 /* Css and javascript includes */
@@ -352,7 +352,7 @@ function opbg_fetch_new_resources(){
 						$entry_data['source'] = $source_id;
 
 						bk1_debug::log('saving the resource');
-						//bk1_debug::log($entry_data);
+						bk1_debug::log($entry_data);
 						$resources->add($entry_data);
 
 						$last_update = $entry_data['pub_time'];
