@@ -10,7 +10,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
 bk1_debug::state_set('off');
-//bk1_debug::print_always_set('off');
+bk1_debug::print_always_set('off');
 
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
 add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
@@ -19,7 +19,7 @@ add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, 
 
 	$source		= pods('sources', $source_id);
 
-	$total 		= pods('resources')->find(['where' => ['status' => 2, 'source.id' => $source_id]])->total_found();
+	$total 		= pods('resources')->find(array('where' => array('status' => 2, 'source.id' => $source_id)))->total_found();
 
 	bk1_debug::log('Auto labeling of sources based on relative resources status');
 
@@ -33,11 +33,13 @@ add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, 
 
 
 // Redirect user to wp-admin
+/*
 add_action( 'init', function () {
 	add_action( 'template_redirect', function(){
 		if(!is_admin()) wp_redirect();
-	}, 10);
-}, 10 );
+	}, 100);
+}, 100 );
+*/
 
 add_filter( 'login_redirect', function($redirect_to, $request, $user){
 	//return admin_url().'index.php';
@@ -48,10 +50,10 @@ add_filter( 'login_redirect', function($redirect_to, $request, $user){
 add_action( 'admin_init', function() {
 	global $pagenow;
 
-	//if (in_array($pagenow, ['index.php', 'admin.php'])){
+	//if (in_array($pagenow, array('index.php', 'admin.php'))){
 		wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
 		wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
-		wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', ['jquery'], false, true);
+		wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', array('jquery'), false, true);
 	//}
 });
 
@@ -76,7 +78,7 @@ function opbg_dashboard_setup()
 			<div class="fetch-button span6">
 				<button data-loading-text="Loading" data-nonce="<?php echo wp_create_nonce('resource_fetch_nonce') ?>" id="resources-fetch" class="btn btn-primary btn-block">Fetch new Resources</i></button>
 			</div>
-			<div class="fetched-results span6 closable-message-wrapper"></div>
+			<div class="fetched-results span6 closable-message-wrapper">Push Fetch to scan the feed for new resources!</div>
 		</section>
 		<hr>
 		<section class="status row-fluid">
@@ -115,13 +117,7 @@ function opbg_admin_logo()
 add_action('admin_head', 'opbg_admin_logo');
 
 function opbg_login_logo() { ?>
-    <style type="text/css">
-        body.login div#login h1 a {
-            background-image: url(<?php echo get_stylesheet_directory_uri() ?>/images/opbg_alpha.png);
-            padding-bottom: 30px;
-			background-size: 149px 89px;
-        }
-    </style>
+	<link rel="stylesheet" type="text/css" href="<?php echo get_stylesheet_directory_uri().'/style/login.less' ?>" media="all" />
 <?php }
 add_action( 'login_enqueue_scripts', 'opbg_login_logo' );
 
@@ -161,13 +157,13 @@ function opbg_get_resource_summary($sorted_by = false ){
 			while($taxonomy->fetch()):
 				$stats = array();
 
-				$stats['total'] = $resources->find( ['where' => [$taxonomy_field => $taxonomy->id()] ] )->total_found();
+				$stats['total'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id()) ) )->total_found();
 
-				$stats['new'] = $resources->find( ['where' => [$taxonomy_field => $taxonomy->id(), 'status' => 1] ] )->total_found();
+				$stats['new'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 1) ) )->total_found();
 
-				$stats['categorized'] = $resources->find( ['where' => [$taxonomy_field => $taxonomy->id(), 'status' => 2] ] )->total_found();
+				$stats['categorized'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 2) ) )->total_found();
 
-				$stats['excluded'] = $resources->find( ['where' => [$taxonomy_field => $taxonomy->id(), 'status' => 0] ] )->total_found();
+				$stats['excluded'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
 
 				$response[$taxonomy->field('name')] = $stats;
 
@@ -176,11 +172,11 @@ function opbg_get_resource_summary($sorted_by = false ){
 	else:
 		$response['total'] = $resources->find()->total_found();
 
-		$response['new'] = $resources->find(['where' => ['status' => 1]])->total_found();
+		$response['new'] = $resources->find(array('where' => array('status' => 1) ) )->total_found();
 
-		$response['categorized'] = $resources->find(['where' => ['status' => 2]])->total_found();
+		$response['categorized'] = $resources->find(array('where' => array('status' => 2) ) )->total_found();
 
-		$response['excluded'] = $resources->find(['where' => ['status' => 0]])->total_found();
+		$response['excluded'] = $resources->find(array('where' => array('status' => 0) ) )->total_found();
 	endif;
 
 	return $response;
@@ -194,7 +190,7 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 
 	$host		= opbg_sanitize_host_url($resource_url);
 
-	$sources->find(['limit' => 1, 'where' => ['t.url' => $host]])->fetch();
+	$sources->find(array('limit' => 1, 'where' => array('t.url' => $host) ) )->fetch();
 
 	// If source already exist
 	if ($sources->exists()):
@@ -203,26 +199,49 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 		//bk1_debug::log($sources->row());
 
 		// Check if resource exist
-		$resources->find(['limit' => 1, 'where' => ['t.url' => $resource_url]])->fetch();
+		$resources->find(array('limit' => 1, 'where' => array('t.url' => $resource_url) ) )->fetch();
 
 		// If resource already exist, add topic and feed to it and exit
 		if ($resources->exists()):
 
+			$recatd = false;
+
 			bk1_debug::log('resource already exists');
+			//bk1_debug::log($resources->field('feeds.id'));
 
-			if (in_array($topic_id, $resources->field('topics'))){
-				$resources->add_to('topics', $topic_id);
+			//bk1_debug::log($topic_id);
+			//bk1_debug::log($resources->field('topics.id'));
+			$resource_topics = $resources->field('topics.id');
+			if (is_array($resource_topics)){
+				if (!in_array($topic_id, $resource_topics)){
+					bk1_debug::log('saving resource under another topic');
+					$resources->add_to('topics', $topic_id);
+					$recatd = true;
+				}
 			}
 
-			if (in_array($feed_id, $resources->field('feeds'))){
-				$resources->add_to('feeds', $feed_id);
+			//bk1_debug::log($resources->field('feeds.id'));
+
+			$resource_feeds = $resources->field('feeds.id');
+			if (is_array($resource_feeds)){
+				if (!in_array($feed_id, $resource_feeds)){
+					bk1_debug::log('saving resource under another feed');
+					$resources->add_to('feeds', $feed_id);
+					$recatd = true;
+				}
 			}
 
-			if (in_array($topic_id, $sources->field('topics'))){
-				$sources->add_to('topic', $topic_id);
+
+			$source_topics = $sources->field('topics.id');
+			if (is_array($source_topics)){
+				if (!in_array($topic_id, $source_topics)){
+					bk1_debug::log('saving source under another topic');
+					$sources->add_to('topics', $topic_id);
+					$recatd = true;
+				}
 			}
 
-			return false;
+			return $recatd;
 		endif;
 
 		bk1_debug::log('resource is new');
@@ -233,7 +252,7 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 	else:
 		bk1_debug::log('source doesn\'t exist, creating a new one');
 		// If source doesn't exist, create a new one
-		$source_id = $sources->add(['url' => $host, 'topics' => $topic_id, 'is_pertinent' => 0]);
+		$source_id = $sources->add(array('url' => $host, 'topics' => $topic_id, 'is_pertinent' => 0) );
 		bk1_debug::log('source id: '.$source_id);
 		//bk1_debug::log(pods('sources')->fetch($source_id));
 	endif;
@@ -268,9 +287,11 @@ function opbg_fetch_new_resources(){
 
 	$new_results 		= 0;
 
-	$new_resources		= [];
+	$new_resources		= 0;
 
-	$duplicates			= 0;
+	$duplicated			= 0;
+
+	$recatd				= 0;
 
 	/* Topics Loop */
 	if ($topics->total() > 0):
@@ -280,105 +301,111 @@ function opbg_fetch_new_resources(){
 
 			$topic_id = $topics->id();
 
-			/* Feeds Loop */
-			foreach($feeds as $feed):
+			if (is_array($feeds)):
 
-				$feed 			= (object)$feed;
+				/* Feeds Loop */
+				foreach($feeds as $feed):
 
-				bk1_debug::log('feed: '.$feed->query);
+					$feed 			= (object)$feed;
 
-				$feed_id 		= $feed->id;
+					bk1_debug::log('feed: '.$feed->query);
 
-				$feed_content   = file_get_contents($feed->url.$url_query);
+					$feed_id 		= $feed->id;
 
-				$xml			= simplexml_load_string($feed_content);
+					$feed_content   = file_get_contents($feed->url.$url_query);
 
-				if ($xml):
+					$xml			= simplexml_load_string($feed_content);
 
-					bk1_debug::log('entered xml');
+					if ($xml):
 
-					/* Entries Loop */
-					foreach($xml->entry as $entry):
+						bk1_debug::log('entered xml');
 
-						bk1_debug::log('processing single entry');
-						//bk1_debug::log($entry);
+						/* Entries Loop */
+						foreach($xml->entry as $entry):
 
-						/* Exit foreach if entry older than last check */
+							bk1_debug::log('processing single entry');
+							//bk1_debug::log($entry);
 
-						$entry_pub_time = date_create($entry->published);
+							/* Exit foreach if entry older than last check */
 
-						if ($entry_pub_time <= date_create($feed->last_check)):
-							bk1_debug::log('entry too old, breaking out of the feed');
-							break;
-						endif;
+							$entry_pub_time = date_create($entry->published);
 
-						/* Fetching monodimensional data from entry */
+							if ($entry_pub_time <= date_create($feed->last_check)):
+								bk1_debug::log('entry too old, breaking out of the feed');
+								break;
+							endif;
 
-						$entry_data = array();
+							/* Fetching monodimensional data from entry */
 
-						$entry_url = array();
+							$entry_data = array();
 
-						// If no url is present go to next entry
-						if (!preg_match('/&q=(.*)&ct/', $entry->link->attributes()->href, $entry_url)){
-							bk1_debug::log('entry doesn\'t have normal url');
-							continue;
-						}
+							$entry_url = array();
 
-						$resources_url = urldecode($entry_url[1]);
+							// If no url is present go to next entry
+							if (!preg_match('/&q=(.*)&ct/', $entry->link->attributes()->href, $entry_url)){
+								bk1_debug::log('entry doesn\'t have normal url');
+								continue;
+							}
 
-						$entry_data['pub_time'] = $entry_pub_time->format('Y-m-d H:i:s');
+							$resources_url = urldecode($entry_url[1]);
 
-						$entry_data['url'] = urldecode($entry_url[1]);
+							$entry_data['pub_time'] = $entry_pub_time->format('Y-m-d H:i:s');
 
-						$entry_data['title'] = (string)$entry->title;
+							$entry_data['url'] = urldecode($entry_url[1]);
 
-						$entry_data['feeds'] = (int)$feed_id;
+							$entry_data['title'] = (string)$entry->title;
 
-						$entry_data['topics'] = (int)$topic_id;
+							$entry_data['feeds'] = (int)$feed_id;
 
-						$entry_data['status'] = 1;
+							$entry_data['topics'] = (int)$topic_id;
 
-						$source_id = opbg_is_resource_existing($entry_data['url'], $topic_id, $feed_id);
+							$entry_data['status'] = 1;
 
-						// Is duplicate, skip entry
-						if ($source_id === false):
-							bk1_debug::log('Duplicated entry, not saving!');
-							$duplicates++;
-							continue;
-						endif;
+							$source_id = opbg_is_resource_existing($entry_data['url'], $topic_id, $feed_id);
 
-						/* Save new entry */
+							// Is duplicate, skip entry
+							if (!is_numeric($source_id)):
+								bk1_debug::log('Duplicated entry, not saving!');
+								$duplicated++;
+								if($source_id === true){
+									$recatd++;
+								}
+								continue;
+							endif;
 
-						$entry_data['source'] = $source_id;
+							/* Save new entry */
 
-						bk1_debug::log('saving the resource');
-						bk1_debug::log($entry_data);
-						$resources->add($entry_data);
+							$entry_data['source'] = $source_id;
 
-						$last_update = $entry_data['pub_time'];
+							bk1_debug::log('saving the resource');
+							bk1_debug::log($entry_data);
+							$resources->add($entry_data);
 
-						$new_resources[] = $entry_data['url'];
-					endforeach;
+							$last_update = $entry_data['pub_time'];
 
-					$last_check = date_create($xml->updated)->format('Y-m-d H:i:s');
+							$new_resources++;
+						endforeach;
 
-					bk1_debug::log('upgrading feed last check timestamp: '.$last_check);
-					pods('feeds', $feed_id)->save('last_check', $last_check);
-				else:
-					bk1_debug::log('We got problems with the xml');
-				endif;
-			endforeach;
+						$last_check = date_create($xml->updated)->format('Y-m-d H:i:s');
+
+						bk1_debug::log('upgrading feed last check timestamp: '.$last_check);
+						pods('feeds', $feed_id)->save('last_check', $last_check);
+					else:
+						bk1_debug::log('We got problems with the xml');
+					endif;
+				endforeach;
+			endif;
 		endwhile;
 
 		header( "Content-Type: application/json" );
 
 		$total_time = time() - $time_start;
 
-		$total_time = (object)['s' => $total_time % 60, 'm' => (int)($total_time / 60) % 60, 'h' => (int)($total_time / 3600)];
+		$total_time = (object)array('s' => $total_time % 60, 'm' => (int)($total_time / 60) % 60, 'h' => (int)($total_time / 3600));
 
 		$total_time = ($total_time->h > 0 ? $total_time->h.'h ': '').($total_time->m > 0 ? $total_time->m.'m ': '').$total_time->s.'s';
 
-		$response = ['success' => true, 'new_results' => count($new_resources), 'summary' => opbg_get_resource_summary(), 'duplicates' => $duplicates, 'duration' => $total_time];
+		$response = array('success' => true, 'new_results' => $new_resources, 'summary' => opbg_get_resource_summary(), 'duplicated' => $duplicated, 'recatd' => $recatd, 'duration' => $total_time);
 
 		echo json_encode($response);
 
