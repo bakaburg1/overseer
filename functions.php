@@ -9,7 +9,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('off');
 
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
@@ -207,32 +207,38 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 			$recatd = false;
 
 			bk1_debug::log('resource already exists');
-			bk1_debug::log($resources->field('feeds.id'));
+			//bk1_debug::log($resources->field('feeds.id'));
 
 			//bk1_debug::log($topic_id);
 			//bk1_debug::log($resources->field('topics.id'));
-			if (!in_array($topic_id, $resources->field('topics.id'))){
-				bk1_debug::log('saving resource under another topic');
-				$resources->add_to('topics', $topic_id);
-				$recatd = true;
+			$resource_topics = $resources->field('topics.id');
+			if (is_array($resource_topics)){
+				if (!in_array($topic_id, $resource_topics)){
+					bk1_debug::log('saving resource under another topic');
+					$resources->add_to('topics', $topic_id);
+					$recatd = true;
+				}
 			}
 
 			//bk1_debug::log($resources->field('feeds.id'));
 
-			bk1_debug::log($feed_id);
-			bk1_debug::log($resources->field('feeds.id'));
-			if (!in_array($feed_id, $resources->field('feeds.id'))){
-				bk1_debug::log('saving resource under another feed');
-				$resources->add_to('feeds', $feed_id);
-				$recatd = true;
+			$resource_feeds = $resources->field('feeds.id');
+			if (is_array($resource_feeds)){
+				if (!in_array($feed_id, $resource_feeds)){
+					bk1_debug::log('saving resource under another feed');
+					$resources->add_to('feeds', $feed_id);
+					$recatd = true;
+				}
 			}
 
-			bk1_debug::log($resources->field('feeds.id'));
 
-			if (!in_array($topic_id, $sources->field('topics.id'))){
-				bk1_debug::log('saving source under another topic');
-				$sources->add_to('topics', $topic_id);
-				$recatd = true;
+			$source_topics = $sources->field('topics.id');
+			if (is_array($source_topics)){
+				if (!in_array($topic_id, $source_topics)){
+					bk1_debug::log('saving source under another topic');
+					$sources->add_to('topics', $topic_id);
+					$recatd = true;
+				}
 			}
 
 			return $recatd;
