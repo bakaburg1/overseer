@@ -149,7 +149,7 @@ function opbg_get_resource_summary($sorted_by = false ){
 	$response 	= array();
 
 	if ($sorted_by != false):
-		$taxonomy = pods($sorted_by, ['limit' => -1]);
+		$taxonomy = pods($sorted_by, array('limit' => -1));
 
 		$taxonomy_field = $sorted_by.'.id';
 
