@@ -1,0 +1,5 @@
+body.login div#login h1 a {
+	background-image: url(../images/opbg_alpha.png);
+	padding-bottom: 30px;
+	background-size: 149px 89px;
+}
