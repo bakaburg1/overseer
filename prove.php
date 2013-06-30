@@ -13,5 +13,10 @@
  * @subpackage Twenty_Twelve
  * @since Twenty Twelve 1.0
  */
-echo admin_url();
+$resources = pods('resources')->find(['limit' => -1]);
+
+while($resources->fetch()){
+var_dump([$resources->field('url'), $resources->field('topics.name'), $resources->field('feeds.query')]);
+
+}
 ?>
