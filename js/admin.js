@@ -84,6 +84,7 @@ jQuery(document).ready(function( $ ) {
 
 		$this.text($this.data('loading-text') + ' ');
 		$this.append($('<i>').addClass('icon-spin icon-refresh'));
+		fetched_results.fadeOut(200);
 
 		$.ajax({
 			type: 		"post",
@@ -93,12 +94,22 @@ jQuery(document).ready(function( $ ) {
 				window.ajaxRes = response;
 				if (response.success == true) {
 					if (response.new_results > 0){
-						fetched_results.html('<span>' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found in ' + response.duration + '!');
+						var recatd_msg = '';
+
+						if (response.recatd > 0)
+							recatd_msg = 'and <span class="old">' + response.recatd + '</span> were found under more topics';
+
+						fetched_results.html('<span class="new">' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found' + recatd_msg + ' in ' + response.duration + '!');
 
 						opbg.dashboard_summary_upgrade_status_values(response.summary);
 					}
 					else {
-						fetched_results.text('Sorry! There were no new resources.');
+						var recatd_msg = '.';
+						console.log(response.recatd);
+						if (response.recatd > 0)
+							recatd_msg = ', but <span class="old">' + response.recatd + '</span> of the old ones were found under new topics!';
+
+						fetched_results.html('Whoops! There are no new resources' + recatd_msg);
 					}
 				}
 				else {
