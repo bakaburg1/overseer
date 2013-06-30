@@ -97,7 +97,7 @@ jQuery(document).ready(function( $ ) {
 						var recatd_msg = '';
 
 						if (response.recatd > 0)
-							recatd_msg = 'and <span class="old">' + response.recatd + '</span> were found under more topics';
+							recatd_msg = ' and <span class="old">' + response.recatd + '</span> were found under more topics';
 
 						fetched_results.html('<span class="new">' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found' + recatd_msg + ' in ' + response.duration + '!');
 
