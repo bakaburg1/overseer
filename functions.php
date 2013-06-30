@@ -78,7 +78,7 @@ function opbg_dashboard_setup()
 			<div class="fetch-button span6">
 				<button data-loading-text="Loading" data-nonce="<?php echo wp_create_nonce('resource_fetch_nonce') ?>" id="resources-fetch" class="btn btn-primary btn-block">Fetch new Resources</i></button>
 			</div>
-			<div class="fetched-results span6 closable-message-wrapper">Push Fetch to scan the feed for new resources!</div>
+			<div class="fetched-results span6 closable-message-wrapper">Push Fetch to scan the feeds for new resources!</div>
 		</section>
 		<hr>
 		<section class="status row-fluid">
@@ -117,7 +117,7 @@ function opbg_admin_logo()
 add_action('admin_head', 'opbg_admin_logo');
 
 function opbg_login_logo() { ?>
-	<link rel="stylesheet" type="text/css" href="<?php echo get_stylesheet_directory_uri().'/style/login.less' ?>" media="all" />
+	<link rel="stylesheet" type="text/css" href="<?php echo get_stylesheet_directory_uri().'/style/login.css' ?>" media="all" />
 <?php }
 add_action( 'login_enqueue_scripts', 'opbg_login_logo' );
 

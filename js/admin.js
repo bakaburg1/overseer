@@ -38,11 +38,11 @@ jQuery(document).ready(function( $ ) {
 			'topics':		'icon-folder-open'
 		};
 		for (var pods in pods_icons){
-			adminmenu.find('.menu-icon-generic.toplevel_page_pods-manage-' + pods + ' .wp-menu-image').addClass(pods_icons[pods]);
+			adminmenu.find('.menu-icon-generic.toplevel_page_pods-manage-' + pods + ' .wp-menu-image').addClass(pods_icons[pods] + ' overridden');
 			$('body.toplevel_page_pods-manage-' + pods + ' #icon-edit-pages').addClass(pods_icons[pods]);
 		}
 
-		adminmenu.find('.menu-icon-dashboard .wp-menu-image').addClass('icon-home');
+		adminmenu.find('.menu-icon-dashboard .wp-menu-image').addClass('icon-home overridden');
 
 		$('.wrap #icon-index').addClass('icon-home');
 	}
