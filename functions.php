@@ -212,34 +212,17 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 			//bk1_debug::log($topic_id);
 			//bk1_debug::log($resources->field('topics.id'));
 			$resource_topics = $resources->field('topics.id');
+            $resources->add_to('topics', $topic_id);
 			if (is_array($resource_topics)){
 				if (!in_array($topic_id, $resource_topics)){
 					bk1_debug::log('saving resource under another topic');
-					$resources->add_to('topics', $topic_id);
 					$recatd = true;
 				}
 			}
 
-			//bk1_debug::log($resources->field('feeds.id'));
+            $resources->add_to('feeds', $feed_id);
 
-			$resource_feeds = $resources->field('feeds.id');
-			if (is_array($resource_feeds)){
-				if (!in_array($feed_id, $resource_feeds)){
-					bk1_debug::log('saving resource under another feed');
-					$resources->add_to('feeds', $feed_id);
-					$recatd = true;
-				}
-			}
-
-
-			$source_topics = $sources->field('topics.id');
-			if (is_array($source_topics)){
-				if (!in_array($topic_id, $source_topics)){
-					bk1_debug::log('saving source under another topic');
-					$sources->add_to('topics', $topic_id);
-					$recatd = true;
-				}
-			}
+            $sources->add_to('topics', $topic_id);
 
 			return $recatd;
 		endif;
@@ -416,6 +399,4 @@ function opbg_fetch_new_resources(){
 }
 
 add_action('wp_ajax_fetch_new_resources', 'opbg_fetch_new_resources');
-
-
 ?>
