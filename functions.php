@@ -212,17 +212,29 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 			//bk1_debug::log($topic_id);
 			//bk1_debug::log($resources->field('topics.id'));
 			$resource_topics = $resources->field('topics.id');
-            $resources->add_to('topics', $topic_id);
 			if (is_array($resource_topics)){
 				if (!in_array($topic_id, $resource_topics)){
+					$resources->add_to('topics', $topic_id);
 					bk1_debug::log('saving resource under another topic');
 					$recatd = true;
 				}
 			}
 
-            $resources->add_to('feeds', $feed_id);
+			$resource_feeds = $resources->field('feeds.id');
+			if (is_array($resource_feeds)){
+				if (!in_array($topic_id, $resource_feeds)){
+					$resources->add_to('feeds', $feed_id);
+					bk1_debug::log('saving resource under another feed');
+				}
+			}
 
-            $sources->add_to('topics', $topic_id);
+			$sources_topics = $sources->field('topics.id');
+			if (is_array($sources_topics)){
+				if (!in_array($topic_id, $sources_topics)){
+					$sources->add_to('topics', $topic_id);
+					bk1_debug::log('saving resource under another feed');
+				}
+			}
 
 			return $recatd;
 		endif;
