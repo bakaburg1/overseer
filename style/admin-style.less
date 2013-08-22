@@ -23,22 +23,22 @@
 #adminmenu {
 	.carved-text;
 
-	li.menu-top div.wp-menu-image{
-		text-align: center;
-		height: 100%;
-		font-size: 1.1rem;
-		padding-top: 4px;
+	.menu-top {
 
-		:hover {
-			color: #D54E21;
+		.wp-menu-image {
+			text-align: center;
+			height: 100%;
+			font-size: 1.1rem;
+			padding-top: 4px;
+
+			:hover {
+				color: #D54E21;
+			}
 		}
-		&.overridden {
+
+		&.menu-icon-dashboard .wp-menu-image {
 			background-image: none;
 		}
-	}
-
-	.menu-icon-users {
-		display: none;
 	}
 }
 
@@ -62,7 +62,10 @@
 }
 
 #dashboard_summary {
-	.fetched-results{
+	.fetching-status i{
+		margin-left: 1rem;
+	}
+	.fetched-results, .fetching-status{
 		.carved-text;
 		color: #8F8F8F;
 		font-weight: lighter;

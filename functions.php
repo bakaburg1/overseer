@@ -1,36 +1,18 @@
 <?php
 
+/**** SETUP ****/
+
 //ini_set('error_reporting', E_ALL & ~E_NOTICE);
 //ini_set('error_log', '/path/to/my/php.log');
-ini_set('log_errors', 'On');      // log to file (yes)
+ini_set('log_errors', 'Off');      // log to file (yes)
 ini_set('display_errors', 'Off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
-bk1_debug::print_always_set('off');
-
-// Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
-add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
-
-	$source_id	= pods('resources', $id)->find()->field('source.id');
-
-	$source		= pods('sources', $source_id);
-
-	$total 		= pods('resources')->find(array('where' => array('status' => 2, 'source.id' => $source_id)))->total_found();
-
-	bk1_debug::log('Auto labeling of sources based on relative resources status');
-
-	if ($total > 0):
-		$source->save('is_pertinent', true);
-	else:
-		$source->save('is_pertinent', false);
-	endif;
-
-}, 10, 3);
-
+bk1_debug::state_set('on');
+bk1_debug::print_always_set('on');
 
 // Redirect user to wp-admin
 /*
@@ -41,24 +23,34 @@ add_action( 'init', function () {
 }, 100 );
 */
 
-add_filter( 'login_redirect', function($redirect_to, $request, $user){
-	//return admin_url().'index.php';
-}, 10, 3);
+/**** UTILITIES ****/
 
-/* Css and javascript includes */
+function opbg_sanitize_host_url($url){
+
+	$url_parsed = parse_url($url);
+
+	bk1_debug::log('getting host url');
+	bk1_debug::log($url_parsed);
+
+	return @isset($url_parsed['host']) ? $url_parsed['host'] : $url_parsed['path'];
+}
+
+/* CSS AND JAVASCRIPTS */
 
 add_action( 'admin_init', function() {
 	global $pagenow;
 
-	//if (in_array($pagenow, array('index.php', 'admin.php'))){
-		wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
-		wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
-		wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', array('jquery'), false, true);
-	//}
+	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
+	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
+	wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', array('jquery'), false, true);
+
+	if($pagenow === 'index.php'){
+		bk1_debug::log('enqueuing admin_dashboard.js');
+		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
+	}
 });
 
-
-/* Some aspect customizations */
+/**** ADMIN CUSTOMIZATION ****/
 
 // Clean the Dashboard
 function opbg_dashboard_setup()
@@ -68,44 +60,9 @@ function opbg_dashboard_setup()
 
 	unset($wp_meta_boxes['dashboard']);
 
-	wp_add_dashboard_widget('dashboard_summary', 'Summary', function(){
+	require_once('includes/dashboard_summary.php');
 
-	$resources = (object)opbg_get_resource_summary();
-
-	?>
-	<div class="bootstrap-wpadmin">
-		<section class="fetch row-fluid">
-			<div class="fetch-button span6">
-				<button data-loading-text="Loading" data-nonce="<?php echo wp_create_nonce('resource_fetch_nonce') ?>" id="resources-fetch" class="btn btn-primary btn-block">Fetch new Resources</i></button>
-			</div>
-			<div class="fetched-results span6 closable-message-wrapper">Push Fetch to scan the feeds for new resources!</div>
-		</section>
-		<hr>
-		<section class="status row-fluid">
-			<div class="status-table span6">
-				<div class="row-fluid">
-					<div class="grid-dummy-first span12"></div>
-					<div class="status-header span6">Status:</div>
-					<div class="status-view-toggle span6">
-						<div class="btn-group" data-toggle="buttons-radio" data-toggle-function="dashboard_summary_print_status_values">
-							<button data-toggle-option="#" class="btn btn-mini active">#</button>
-							<button data-toggle-option="%" class="btn btn-mini">%</button>
-						</div>
-					</div>
-					<div class="separator span12"></div>
-					<div class="status-new key span6">New:</div><div class="status-new value span6" data-status-value="<?php echo $resources->new ?>"></div>
-					<div class="status-categorized key span6">Categorized:</div><div class="status-categorized value span6" data-status-value="<?php echo $resources->categorized ?>"></div>
-					<div class="status-excluded key span6">Excluded:</div><div class="status-excluded value span6" data-status-value="<?php echo $resources->excluded ?>"></div>
-					<div class="separator span12"></div>
-					<div class="status-total key span6">Total:</div><div class="status-total value span6" data-status-value="<?php echo $resources->total ?>"></div>
-				</div>
-			</div>
-			<div class="status-graph span6">
-
-			</div>
-		</section>
-	</div>
-	<?php });
+	build_dashboard_summary();
 }
 
 add_action('wp_dashboard_setup', 'opbg_dashboard_setup', 100 );
@@ -131,15 +88,109 @@ function opbg_login_logo_url_title() {
 }
 add_filter( 'login_headertitle', 'opbg_login_logo_url_title' );
 
-function opbg_sanitize_host_url($url){
+add_action( 'admin_menu', function(){
+	global $current_user;
 
-	$url_parsed = parse_url($url);
+	if (!in_array('administrator', $current_user->roles)){
+		remove_menu_page( 'users.php' );
+	}
+} );
 
-	bk1_debug::log('getting host url');
-	bk1_debug::log($url_parsed);
+/**** ACTIONS AND FILTERS ****/
 
-	return @isset($url_parsed['host']) ? $url_parsed['host'] : $url_parsed['path'];
-}
+// On post creation through ifttt call post to resource converter
+add_action( 'wp_insert_post', function($post_id, $post){
+	//bk1_debug::log('wp_insert_post called!');
+	if (has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
+		opbg_add_new_resource_from_post($post);
+	}
+}, 10, 2);
+
+// Redirect to admin on login
+add_filter( 'login_redirect', function($redirect_to, $request, $user){
+	return admin_url().'index.php';
+}, 10, 3);
+
+
+add_filter( 'xmlrpc_enabled', function($enabled){
+
+	return get_option( 'remote_resources_fetching_status', false );
+});
+
+add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
+
+	if ( !wp_verify_nonce( $_REQUEST['nonce'], "remote_resource_fetching_toggle_nonce")) {
+      exit("No naughty business please");
+	}
+
+	bk1_debug::log('toggling resource fetching');
+
+	$success = false;
+
+	if ( $_REQUEST['remote_resources_fetching_status'] === 'off'){
+		$success = update_option( 'remote_resources_fetching_status', false );
+
+		$status = 'inactive';
+	}
+	elseif ( $_REQUEST['remote_resources_fetching_status'] === 'on'){
+		$success = update_option( 'remote_resources_fetching_status', true );
+
+		$status = 'active';
+	}
+
+	header( "Content-Type: application/json" );
+
+	$response = array('success' => $success, 'status' => $status);
+
+	echo json_encode($response);
+
+	die();
+
+});
+
+add_filter( 'heartbeat_received', function($response, $data){
+	// Make sure we only run our query if the edd_heartbeat key is present
+    if( $data['dashboard_hearbeat'] === 'upgrade_dashboard_summary' ) {
+    	if ( get_option('are_new_resources', false) ){
+	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
+	    	bk1_debug::log('sending resources upgrade');
+    	}
+    }
+
+    bk1_debug::log('sending heartbeat response');
+
+    return $response;
+
+}, 10, 2 );
+
+/*
+add_action( 'xmlrpc_call', function($post){
+	$user = wp_get_current_user();
+
+	if (in_array($user->user_login, get_option( 'disabled_xml_rpc_users', $default = false )))
+
+});*/
+
+/**** PODS FUNCTIONS ****/
+
+// Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
+add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
+
+	$source_id	= pods('resources', $id)->find()->field('source.id');
+
+	$source		= pods('sources', $source_id);
+
+	$total 		= pods('resources')->find(array('where' => array('status' => 2, 'source.id' => $source_id)))->total_found();
+
+	bk1_debug::log('Auto labeling of sources based on relative resources status');
+
+	if ($total > 0):
+		$source->save('is_pertinent', true);
+	else:
+		$source->save('is_pertinent', false);
+	endif;
+
+}, 10, 3);
 
 // Get a summary of resurces for every topic
 function opbg_get_resource_summary($sorted_by = false ){
@@ -183,14 +234,14 @@ function opbg_get_resource_summary($sorted_by = false ){
 }
 
 /* Checking if resource and source are already existing */
-function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
+function opbg_is_resource_existing($resource_data){
 	$sources	= pods('sources');
 
 	$resources	= pods('resources');
 
-	$host		= opbg_sanitize_host_url($resource_url);
+	$host		= opbg_sanitize_host_url($resource_data['url']);
 
-	$sources->find(array('limit' => 1, 'where' => array('t.url' => $host) ) )->fetch();
+	bk1_debug::log($sources->find(array('limit' => 1, 'where' => array('url' => $host) ) )->fetch());
 
 	// If source already exist
 	if ($sources->exists()):
@@ -199,44 +250,36 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 		//bk1_debug::log($sources->row());
 
 		// Check if resource exist
-		$resources->find(array('limit' => 1, 'where' => array('t.url' => $resource_url) ) )->fetch();
+		$resources->find(array('limit' => 1, 'where' => array('t.url' => $resource_data['url']) ) )->fetch();
 
-		// If resource already exist, add topic and feed to it and exit
+		// If resource already exist, add topic to it and exit
 		if ($resources->exists()):
-
-			$recatd = false;
 
 			bk1_debug::log('resource already exists');
 			//bk1_debug::log($resources->field('feeds.id'));
 
 			//bk1_debug::log($topic_id);
-			//bk1_debug::log($resources->field('topics.id'));
+			bk1_debug::log($resources->field('topics.id'));
 			$resource_topics = $resources->field('topics.id');
 			if (is_array($resource_topics)){
-				if (!in_array($topic_id, $resource_topics)){
-					$resources->add_to('topics', $topic_id);
+				if (!in_array($resource_data['topics'], $resource_topics)){
+					$resources->add_to('topics', $resource_data['topics']);
 					bk1_debug::log('saving resource under another topic');
-					$recatd = true;
+				}
+				else{
+					bk1_debug::log('topic already present');
 				}
 			}
 
-			$resource_feeds = $resources->field('feeds.id');
-			if (is_array($resource_feeds)){
-				if (!in_array($topic_id, $resource_feeds)){
-					$resources->add_to('feeds', $feed_id);
-					bk1_debug::log('saving resource under another feed');
+			$source_topics = $sources->field('topics.id');
+			if (is_array($source_topics)){
+				if (!in_array($resource_data['topics'], $source_topics)){
+					$sources->add_to('topics', $resource_data['topics']);
+					bk1_debug::log('saving source under another feed');
 				}
 			}
 
-			$sources_topics = $sources->field('topics.id');
-			if (is_array($sources_topics)){
-				if (!in_array($topic_id, $sources_topics)){
-					$sources->add_to('topics', $topic_id);
-					bk1_debug::log('saving resource under another feed');
-				}
-			}
-
-			return $recatd;
+			return false;
 		endif;
 
 		bk1_debug::log('resource is new');
@@ -247,7 +290,7 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 	else:
 		bk1_debug::log('source doesn\'t exist, creating a new one');
 		// If source doesn't exist, create a new one
-		$source_id = $sources->add(array('url' => $host, 'topics' => $topic_id, 'is_pertinent' => 0) );
+		$source_id = $sources->add(array('url' => $host, 'topics' => $resource_data['topics'], 'is_pertinent' => 0) );
 		bk1_debug::log('source id: '.$source_id);
 		//bk1_debug::log(pods('sources')->fetch($source_id));
 	endif;
@@ -255,6 +298,61 @@ function opbg_is_resource_existing($resource_url, $topic_id, $feed_id){
 	return $source_id;
 }
 
+// Convert posts to resources
+function opbg_add_new_resource_from_post($post){
+
+	bk1_debug::log($post);
+
+	$resources = pods('resources');
+
+	$topics = pods('topics');
+
+	$resource_data = array();
+
+	/* IFTTT post data parsing */
+
+	$content = explode("\n", trim(preg_replace("/(<--[\w]*-->)/", "\n$1", html_entity_decode($post->post_content))));
+
+	foreach ($content as $field):
+		$buffer = array();
+		preg_match("/<--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
+		$buffer = array_map('trim', $buffer);
+		$resource_data[ $buffer[ 'key' ] ] = $buffer[ 'value' ];
+	endforeach;
+
+	/* Completing other post fields */
+
+	$resource_data['title'] = $post->post_title;
+
+	$resource_data['pub_time'] = date_create($post->post_date)->format('Y-m-d H:i:s');
+
+	$resource_data['status'] = 1;
+
+	// Transform the topic name in it's ID
+	$topics->find(array('where' => array('name' => $resource_data['topics'] )))->fetch();
+	$resource_data['topics'] = $topics->id();
+
+	// Check if resource is existing, and return the source ID. If resource is already existing, false is returning
+	$resource_data['source'] = opbg_is_resource_existing($resource_data);
+
+	// If duplicated, skip resource
+	if ($resource_data['source'] === false):
+		wp_delete_post( $post->ID, true );
+		bk1_debug::log('resource existing, exiting');
+		return false;
+	endif;
+
+	/* Save new entry */
+	bk1_debug::log('saving resource');
+	if ($resources->add($resource_data)){
+		update_option( 'are_new_resources', true );
+		wp_delete_post( $post->ID, true );
+	}
+
+	return true;
+}
+
+/* Fetches new resources by looping through topics associated google alerts feeds (DEPRECATED)
 function opbg_fetch_new_resources(){
 
 	$time_start = time();
@@ -269,14 +367,12 @@ function opbg_fetch_new_resources(){
 
 	bk1_debug::log('nonce verified');
 
-	/* Setup */
+	// Setup 
 	$entries_per_page	= 1000;
 
 	$url_query			= '?'.http_build_query(array('n' => $entries_per_page));
 
 	$topics 			= pods('topics', array('limit' => -1));
-
-	$sources 			= pods('sources');
 
 	$resources 			= pods('resources');
 
@@ -288,7 +384,7 @@ function opbg_fetch_new_resources(){
 
 	$recatd				= 0;
 
-	/* Topics Loop */
+	/* Topics Loop 
 	if ($topics->total() > 0):
 		while ($topics->fetch()):
 			//bk1_debug::log('topic: '.$topics->field('name'));
@@ -298,7 +394,7 @@ function opbg_fetch_new_resources(){
 
 			if (is_array($feeds)):
 
-				/* Feeds Loop */
+				/ Feeds Loop /
 				foreach($feeds as $feed):
 
 					$feed 			= (object)$feed;
@@ -315,13 +411,13 @@ function opbg_fetch_new_resources(){
 
 						bk1_debug::log('entered xml');
 
-						/* Entries Loop */
+						/ Entries Loop /
 						foreach($xml->entry as $entry):
 
 							bk1_debug::log('processing single entry');
 							//bk1_debug::log($entry);
 
-							/* Exit foreach if entry older than last check */
+							/ Exit foreach if entry older than last check /
 
 							$entry_pub_time = date_create($entry->published);
 
@@ -330,7 +426,7 @@ function opbg_fetch_new_resources(){
 								break;
 							endif;
 
-							/* Fetching monodimensional data from entry */
+							/* Fetching monodimensional data from entry /
 
 							$entry_data = array();
 
@@ -368,7 +464,7 @@ function opbg_fetch_new_resources(){
 								continue;
 							endif;
 
-							/* Save new entry */
+							/* Save new entry /
 
 							$entry_data['source'] = $source_id;
 
@@ -411,4 +507,5 @@ function opbg_fetch_new_resources(){
 }
 
 add_action('wp_ajax_fetch_new_resources', 'opbg_fetch_new_resources');
+*/
 ?>
