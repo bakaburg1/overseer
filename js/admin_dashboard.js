@@ -1,6 +1,6 @@
 jQuery(document).ready(function ($) {
 
-	console.log('admin_dashboard.js called');
+	//console.log('admin_dashboard.js called');
 
 	window.dashboard_summary_widget = $('#dashboard_summary');
 
@@ -41,7 +41,7 @@ jQuery(document).ready(function ($) {
 		if ( ! data.dashboard_summary_data )
             return;
 
-        dashboard_summary_upgrade_status_values(data.dashboard_summary_data.summary);
+        opbg.dashboard_summary_upgrade_status_values(data.dashboard_summary_data.summary);
     });
 
 	opbg.dashboard_summary_print_status_values();

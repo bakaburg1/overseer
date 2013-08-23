@@ -4,11 +4,12 @@
 
 //ini_set('error_reporting', E_ALL & ~E_NOTICE);
 //ini_set('error_log', '/path/to/my/php.log');
-define('WP_DEBUG', false); // or false
+/*define('WP_DEBUG', false); // or false
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
 }
+*/
 ini_set('log_errors', 'Off');      // log to file (yes)
 ini_set('display_errors', 'Off'); // log to screen (no)
 
@@ -158,10 +159,11 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 
 add_filter( 'heartbeat_received', function($response, $data){
 	// Make sure we only run our query if the proper key is present
-    if( $data['dashboard_hearbeat'] === 'upgrade_dashboard_summary' ) {
+    if( $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
     	if ( get_option('are_new_resources', false) ){
 	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
 	    	bk1_debug::log('sending resources upgrade');
+	    	update_option('are_new_resources', false);
     	}
     }
 
