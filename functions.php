@@ -93,6 +93,7 @@ add_action( 'admin_menu', function(){
 
 	if (!in_array('administrator', $current_user->roles)){
 		remove_menu_page( 'users.php' );
+		remove_menu_page( 'edit.php' );
 	}
 } );
 
