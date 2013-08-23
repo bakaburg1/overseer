@@ -41,7 +41,7 @@ jQuery(document).ready(function ($) {
 		if ( ! data.dashboard_summary_data )
             return;
 
-        opbg.dashboard_summary_upgrade_status_values(data.dashboard_summary_data.summary);
+        opbg.dashboard_summary_upgrade_status_values(data.dashboard_summary_data);
     });
 
 	opbg.dashboard_summary_print_status_values();
