@@ -4,6 +4,11 @@
 
 //ini_set('error_reporting', E_ALL & ~E_NOTICE);
 //ini_set('error_log', '/path/to/my/php.log');
+define('WP_DEBUG', false); // or false
+if (WP_DEBUG) {
+  define('WP_DEBUG_LOG', true);
+  define('WP_DEBUG_DISPLAY', false);
+}
 ini_set('log_errors', 'Off');      // log to file (yes)
 ini_set('display_errors', 'Off'); // log to screen (no)
 
@@ -11,7 +16,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
 
 // Redirect user to wp-admin
@@ -93,7 +98,6 @@ add_action( 'admin_menu', function(){
 
 	if (!in_array('administrator', $current_user->roles)){
 		remove_menu_page( 'users.php' );
-		remove_menu_page( 'edit.php' );
 	}
 } );
 
@@ -101,8 +105,11 @@ add_action( 'admin_menu', function(){
 
 // On post creation through ifttt call post to resource converter
 add_action( 'wp_insert_post', function($post_id, $post){
-	//bk1_debug::log('wp_insert_post called!');
-	if (has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
+	bk1_debug::log('wp_insert_post called!');
+	bk1_debug::log('post id: '.$post_id.' and title: '.$post->post_title);
+	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
+	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
+	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
 		opbg_add_new_resource_from_post($post);
 	}
 }, 10, 2);
@@ -150,7 +157,7 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 });
 
 add_filter( 'heartbeat_received', function($response, $data){
-	// Make sure we only run our query if the edd_heartbeat key is present
+	// Make sure we only run our query if the proper key is present
     if( $data['dashboard_hearbeat'] === 'upgrade_dashboard_summary' ) {
     	if ( get_option('are_new_resources', false) ){
 	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
@@ -158,7 +165,7 @@ add_filter( 'heartbeat_received', function($response, $data){
     	}
     }
 
-    bk1_debug::log('sending heartbeat response');
+    //bk1_debug::log('sending heartbeat response');
 
     return $response;
 
@@ -302,7 +309,7 @@ function opbg_is_resource_existing($resource_data){
 // Convert posts to resources
 function opbg_add_new_resource_from_post($post){
 
-	bk1_debug::log($post);
+	bk1_debug::log('converting the post '.$post->post_title);
 
 	$resources = pods('resources');
 
@@ -312,11 +319,14 @@ function opbg_add_new_resource_from_post($post){
 
 	/* IFTTT post data parsing */
 
-	$content = explode("\n", trim(preg_replace("/(<--[\w]*-->)/", "\n$1", html_entity_decode($post->post_content))));
+	$content = explode("\n", trim(preg_replace("/(<\s*--[\w]*-->)/", "\n$1", html_entity_decode($post->post_content))));
 
+    bk1_debug::log('log post content');
+	bk1_debug::log($content);
+    
 	foreach ($content as $field):
 		$buffer = array();
-		preg_match("/<--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
+		preg_match("/<\s*--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
 		$buffer = array_map('trim', $buffer);
 		$resource_data[ $buffer[ 'key' ] ] = $buffer[ 'value' ];
 	endforeach;
@@ -332,6 +342,9 @@ function opbg_add_new_resource_from_post($post){
 	// Transform the topic name in it's ID
 	$topics->find(array('where' => array('name' => $resource_data['topics'] )))->fetch();
 	$resource_data['topics'] = $topics->id();
+	
+	bk1_debug::log('Resource parsed prior source check');
+	bk1_debug::log($resource_data);
 
 	// Check if resource is existing, and return the source ID. If resource is already existing, false is returning
 	$resource_data['source'] = opbg_is_resource_existing($resource_data);
@@ -346,8 +359,13 @@ function opbg_add_new_resource_from_post($post){
 	/* Save new entry */
 	bk1_debug::log('saving resource');
 	if ($resources->add($resource_data)){
+	    bk1_debug::log('resource saved!');
+	    bk1_debug::log($resource_data);
 		update_option( 'are_new_resources', true );
 		wp_delete_post( $post->ID, true );
+	}else {
+	    bk1_debug::log('resource saving failed!');
+		wp_mail( get_option( 'admin_email' ), get_option( 'blogname' ).': There was a error saving the post into a resource', 'There was a error saving the post into a resource');
 	}
 
 	return true;
