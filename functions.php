@@ -17,7 +17,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 // Redirect user to wp-admin
@@ -41,10 +41,22 @@ function opbg_sanitize_host_url($url){
 	return @isset($url_parsed['host']) ? $url_parsed['host'] : $url_parsed['path'];
 }
 
+function is_pods_detail_page($pods = ''){
+	global $pagenow;
+
+	$page_query = parse_url(pods_current_url());
+
+	$parsed_page_query = wp_parse_args($page_query['query']);
+
+	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND $parsed_page_query['action'] === 'edit';
+}
+
 /* CSS AND JAVASCRIPTS */
 
 add_action( 'admin_init', function() {
-	global $pagenow;
+	global $pagenow, $wp;
+
+	
 
 	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
 	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
@@ -53,6 +65,12 @@ add_action( 'admin_init', function() {
 	if($pagenow === 'index.php'){
 		bk1_debug::log('enqueuing admin_dashboard.js');
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
+	}
+
+	if (is_pods_detail_page()){
+		bk1_debug::log('enqueuing ScrollToFixed.js');
+		wp_enqueue_script('ScrollToFixed', get_stylesheet_directory_uri().'/js/ScrollToFixed.js', array('jquery'), false, true);
+		
 	}
 });
 
