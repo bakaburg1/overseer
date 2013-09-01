@@ -14,12 +14,18 @@ jQuery(document).ready(function ($) {
 			'topics':		'icon-folder-open'
 		};
 
-		adminmenu.find('.menu-icon-generic').removeClass('menu-icon-generic');
+		adminmenu.find('.wp-menu-image img[src ~= font-class]').each(function(){
+			$(this).hide();
+			var font_class= $(this).attr('src').replace('font-class', '');
+			$(this).parent().addClass(font_class);
 
-		for (var pods in pods_icons){
-			adminmenu.find('.toplevel_page_pods-manage-' + pods + ' .wp-menu-image').addClass(pods_icons[pods]);
-			$('body.toplevel_page_pods-manage-' + pods + ' #icon-edit-pages').addClass(pods_icons[pods]);
-		}
+			var pod_type = $(this).closest('li').attr('id');
+			console.log(pod_type);
+
+			$('body.' + pod_type + ' #icon-edit-pages').addClass(font_class);
+
+			$(this).remove();
+		});
 
 		adminmenu.find('.menu-icon-dashboard .wp-menu-image').addClass('icon-home');
 
