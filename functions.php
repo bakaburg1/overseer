@@ -4,7 +4,7 @@
 
 //ini_set('error_reporting', E_ALL & ~E_NOTICE);
 //ini_set('error_log', '/path/to/my/php.log');
-/*define('WP_DEBUG', false); // or false
+/*define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
@@ -17,7 +17,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
 
 // Redirect user to wp-admin
@@ -54,9 +54,7 @@ function is_pods_detail_page($pods = ''){
 /* CSS AND JAVASCRIPTS */
 
 add_action( 'admin_init', function() {
-	global $pagenow, $wp;
-
-	
+	global $pagenow;
 
 	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
 	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
@@ -66,11 +64,10 @@ add_action( 'admin_init', function() {
 		bk1_debug::log('enqueuing admin_dashboard.js');
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
 	}
-
+	
 	if (is_pods_detail_page()){
 		bk1_debug::log('enqueuing ScrollToFixed.js');
 		wp_enqueue_script('ScrollToFixed', get_stylesheet_directory_uri().'/js/ScrollToFixed.js', array('jquery'), false, true);
-		
 	}
 });
 
@@ -177,10 +174,12 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 
 add_filter( 'heartbeat_received', function($response, $data){
 	// Make sure we only run our query if the proper key is present
+	bk1_debug::log('heartbeat_received');
     if( $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
     	if ( get_option('are_new_resources', false) ){
 	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
 	    	bk1_debug::log('sending resources upgrade');
+	    	bk1_debug::log($response);
 	    	update_option('are_new_resources', false);
     	}
     }
@@ -391,160 +390,4 @@ function opbg_add_new_resource_from_post($post){
 	return true;
 }
 
-/* Fetches new resources by looping through topics associated google alerts feeds (DEPRECATED)
-function opbg_fetch_new_resources(){
-
-	$time_start = time();
-
-	set_time_limit(0);
-
-	bk1_debug::log('ajax called');
-
-	if ( !wp_verify_nonce( $_REQUEST['nonce'], "resource_fetch_nonce")) {
-      exit("No naughty business please");
-	}
-
-	bk1_debug::log('nonce verified');
-
-	// Setup 
-	$entries_per_page	= 1000;
-
-	$url_query			= '?'.http_build_query(array('n' => $entries_per_page));
-
-	$topics 			= pods('topics', array('limit' => -1));
-
-	$resources 			= pods('resources');
-
-	$new_results 		= 0;
-
-	$new_resources		= 0;
-
-	$duplicated			= 0;
-
-	$recatd				= 0;
-
-	/* Topics Loop 
-	if ($topics->total() > 0):
-		while ($topics->fetch()):
-			//bk1_debug::log('topic: '.$topics->field('name'));
-			$feeds = $topics->field('feeds');
-
-			$topic_id = $topics->id();
-
-			if (is_array($feeds)):
-
-				/ Feeds Loop /
-				foreach($feeds as $feed):
-
-					$feed 			= (object)$feed;
-
-					bk1_debug::log('feed: '.$feed->query);
-
-					$feed_id 		= $feed->id;
-
-					$feed_content   = file_get_contents($feed->url.$url_query);
-
-					$xml			= simplexml_load_string($feed_content);
-
-					if ($xml):
-
-						bk1_debug::log('entered xml');
-
-						/ Entries Loop /
-						foreach($xml->entry as $entry):
-
-							bk1_debug::log('processing single entry');
-							//bk1_debug::log($entry);
-
-							/ Exit foreach if entry older than last check /
-
-							$entry_pub_time = date_create($entry->published);
-
-							if ($entry_pub_time <= date_create($feed->last_check)):
-								bk1_debug::log('entry too old, breaking out of the feed');
-								break;
-							endif;
-
-							/* Fetching monodimensional data from entry /
-
-							$entry_data = array();
-
-							$entry_url = array();
-
-							// If no url is present go to next entry
-							if (!preg_match('/&q=(.*)&ct/', $entry->link->attributes()->href, $entry_url)){
-								bk1_debug::log('entry doesn\'t have normal url');
-								continue;
-							}
-
-							$resources_url = urldecode($entry_url[1]);
-
-							$entry_data['pub_time'] = $entry_pub_time->format('Y-m-d H:i:s');
-
-							$entry_data['url'] = urldecode($entry_url[1]);
-
-							$entry_data['title'] = (string)$entry->title;
-
-							$entry_data['feeds'] = (int)$feed_id;
-
-							$entry_data['topics'] = (int)$topic_id;
-
-							$entry_data['status'] = 1;
-
-							$source_id = opbg_is_resource_existing($entry_data['url'], $topic_id, $feed_id);
-
-							// Is duplicate, skip entry
-							if (!is_numeric($source_id)):
-								bk1_debug::log('Duplicated entry, not saving!');
-								$duplicated++;
-								if($source_id === true){
-									$recatd++;
-								}
-								continue;
-							endif;
-
-							/* Save new entry /
-
-							$entry_data['source'] = $source_id;
-
-							bk1_debug::log('saving the resource');
-							bk1_debug::log($entry_data);
-							$resources->add($entry_data);
-
-							$last_update = $entry_data['pub_time'];
-
-							$new_resources++;
-						endforeach;
-
-						$last_check = date_create($xml->updated)->format('Y-m-d H:i:s');
-
-						bk1_debug::log('upgrading feed last check timestamp: '.$last_check);
-						pods('feeds', $feed_id)->save('last_check', $last_check);
-					else:
-						bk1_debug::log('We got problems with the xml');
-					endif;
-				endforeach;
-			endif;
-		endwhile;
-
-		header( "Content-Type: application/json" );
-
-		$total_time = time() - $time_start;
-
-		$total_time = (object)array('s' => $total_time % 60, 'm' => (int)($total_time / 60) % 60, 'h' => (int)($total_time / 3600));
-
-		$total_time = ($total_time->h > 0 ? $total_time->h.'h ': '').($total_time->m > 0 ? $total_time->m.'m ': '').$total_time->s.'s';
-
-		$response = array('success' => true, 'new_results' => $new_resources, 'summary' => opbg_get_resource_summary(), 'duplicated' => $duplicated, 'recatd' => $recatd, 'duration' => $total_time);
-
-		echo json_encode($response);
-
-		bk1_debug::log_print();
-
-		die();
-	endif;
-}
-
-add_action('wp_ajax_fetch_new_resources', 'opbg_fetch_new_resources');
-*/
 ?>

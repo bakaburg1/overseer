@@ -6,13 +6,6 @@ jQuery(document).ready(function ($) {
 	// Add classes to admin menu
 	opbg.set_admin_menu_icons = function(){
 		var adminmenu	= $('#adminmenu');
-		var pods_icons = {
-			'authors':		'icon-user',
-			'feeds':		'icon-rss',
-			'resources':	'icon-compass',
-			'sources':		'icon-globe',
-			'topics':		'icon-folder-open'
-		};
 
 		adminmenu.find('.wp-menu-image img[src ~= font-class]').each(function(){
 			$(this).hide();
