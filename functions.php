@@ -2,32 +2,23 @@
 
 /**** SETUP ****/
 
-//ini_set('error_reporting', E_ALL & ~E_NOTICE);
+ini_set('error_reporting', E_ALL & ~E_NOTICE);
 //ini_set('error_log', '/path/to/my/php.log');
-/*define('WP_DEBUG', true);
+define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
 }
-*/
-ini_set('log_errors', 'Off');      // log to file (yes)
-ini_set('display_errors', 'Off'); // log to screen (no)
+
+ini_set('log_errors', 'on');      // log to file (yes)
+ini_set('display_errors', 'on'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
-
-// Redirect user to wp-admin
-/*
-add_action( 'init', function () {
-	add_action( 'template_redirect', function(){
-		if(!is_admin()) wp_redirect();
-	}, 100);
-}, 100 );
-*/
 
 /**** UTILITIES ****/
 
@@ -174,7 +165,7 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 
 add_filter( 'heartbeat_received', function($response, $data){
 	// Make sure we only run our query if the proper key is present
-	bk1_debug::log('heartbeat_received');
+	//bk1_debug::log('heartbeat_received');
     if( $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
     	if ( get_option('are_new_resources', false) ){
 	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
@@ -237,12 +228,18 @@ function opbg_get_resource_summary($sorted_by = false ){
 
 				$stats['total'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id()) ) )->total_found();
 
-				$stats['new'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 1) ) )->total_found();
+				if ($stats['total'] > 0){
 
-				$stats['categorized'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 2) ) )->total_found();
+					$stats['new'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 1) ) )->total_found();
 
-				$stats['excluded'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
+					$stats['categorized'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 2) ) )->total_found();
 
+					$stats['excluded'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
+
+				}
+				else {
+					$stats['new'] = $stats['categorized'] = $stats['excluded'] = $stats['total'];
+				}
 				$response[$taxonomy->field('name')] = $stats;
 
 			endwhile;
@@ -276,9 +273,40 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log('source already exists');
 		//bk1_debug::log($sources->row());
 
+		$blacklisted = $sources->field('blacklisted');
+
+		bk1_debug::log('source blacklisted paths:');
+		bk1_debug::log($blacklisted);
+
+		if (trim($blacklisted) !== ''):
+ 
+			if ($blacklisted === '*'):
+				bk1_debug::log('Whole site is blacklisted');
+				return false; // The whole site is blacklisted
+			else:
+
+				$blacklisted = explode("\n", $blacklisted);
+
+				foreach ($blacklisted as $path) {
+					if ($path[0] !== '/') $path = '/'.$path;
+					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
+					bk1_debug::log($host);
+					if (strpos($resource_data['url'], $host.$path) !== false){
+						bk1_debug::log('This page is blacklisted');
+						return false;
+					}
+				}
+
+				bk1_debug::log('This page is not blacklisted');
+			endif;
+		endif;
+
 		// Check if resource exist
 		$resources->find(array('limit' => 1, 'where' => array('t.url' => $resource_data['url']) ) )->fetch();
+		$same_url = $resources->exists();
 
+		$resources->find(array('limit' => 1, 'where' => array('t.title' => $resource_data['title']) ) )->fetch();
+		$same_title = $resources->exists();
 		// If resource already exist, add topic to it and exit
 		if ($resources->exists()):
 
@@ -371,7 +399,7 @@ function opbg_add_new_resource_from_post($post){
 	// If duplicated, skip resource
 	if ($resource_data['source'] === false):
 		wp_delete_post( $post->ID, true );
-		bk1_debug::log('resource existing, exiting');
+		bk1_debug::log('resource existing or blacklisted, exiting');
 		return false;
 	endif;
 
