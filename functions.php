@@ -17,7 +17,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 /**** UTILITIES ****/
@@ -287,11 +287,17 @@ function opbg_is_resource_existing($resource_data){
 
 				$blacklisted = explode("\n", $blacklisted);
 
+				bk1_debug::log($blacklisted);
+				
 				foreach ($blacklisted as $path) {
-					$path = trim($trim);
+					$path = trim($path);
+					bk1_debug::log($path);
 					if ($path[0] !== '/') $path = '/'.$path;
+					bk1_debug::log($path);
 					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
-					bk1_debug::log($host);
+					bk1_debug::log($path);
+
+					bk1_debug::log($host.$path);
 					if (strpos($resource_data['url'], $host.$path) !== false){
 						bk1_debug::log('This page is blacklisted');
 						return false;
