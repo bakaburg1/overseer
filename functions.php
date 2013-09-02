@@ -273,7 +273,7 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log('source already exists');
 		//bk1_debug::log($sources->row());
 
-		$blacklisted = $sources->field('blacklisted');
+		$blacklisted = trim($sources->field('blacklisted'));
 
 		bk1_debug::log('source blacklisted paths:');
 		bk1_debug::log($blacklisted);
@@ -288,6 +288,7 @@ function opbg_is_resource_existing($resource_data){
 				$blacklisted = explode("\n", $blacklisted);
 
 				foreach ($blacklisted as $path) {
+					$path = trim($trim);
 					if ($path[0] !== '/') $path = '/'.$path;
 					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
 					bk1_debug::log($host);
