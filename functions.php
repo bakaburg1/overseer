@@ -278,7 +278,7 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log('source blacklisted paths:');
 		bk1_debug::log($blacklisted);
 
-		if (trim($blacklisted) !== ''):
+		if (!empty(trim($blacklisted)):
  
 			if ($blacklisted === '*'):
 				bk1_debug::log('Whole site is blacklisted');
