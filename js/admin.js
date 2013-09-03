@@ -25,13 +25,41 @@ jQuery(document).ready(function ($) {
 		$('.wrap #icon-index').addClass('icon-home');
 	};
 
-	opbg.quickedit_resource_pertinency = function() {
+	opbg.manage_pods_list_page = function() {
 		if ($('#the-list').length !== 0){
+
+			$('#the-list tr').each(function(){
+				$(this).find('td').each(function(index){
+					$(this).attr('data-pods-field', pods_list_page_data.list_fields_manage[index]).addClass('pods-fields-' + pods_list_page_data.list_fields_manage[index]);
+				});
+			});
+
 			console.log('Resources list page');
 
-			$('#the-list .row-actions').append(' | <span class="pertinency-toggle"><a href="#" title="change pertinency" alt="change pertinency">Set as not pertinent</a></span>');
-		
-			$('#the-list').on('click.quickedit_resource_pertinency', '.pertinency-toggle a', function() {
+			var table_rows = $('#the-list .row-actions');
+
+			var current_pods;
+
+			var fields_to_change;
+
+			var new_value;
+
+			table_rows.append(' | <span class="pods-quick-edit"><a href="#"></a></span>');
+
+			if (pods_list_page_data.current_pods === 'resources'){
+				table_rows.find('.pods-quick-edit a').text('Set as not pertinent');
+				fields_to_change = 'status';
+				new_value = 0;
+
+			}
+
+			if (pods_list_page_data.current_pods === 'sources'){
+				table_rows.find('.pods-quick-edit a').text('Blacklist whole site');
+				fields_to_change = 'blacklisted';
+				new_value = '*';
+			}
+
+			table_rows.on('click.pods_item_quick_edit', '.pods-quick-edit a', function() {
 				$this = $(this);
 
 				if ($this.hasClass('disabled')) return false;
@@ -42,22 +70,27 @@ jQuery(document).ready(function ($) {
 
 				var loading = $this.siblings('i');
 
-				var status_item = $this.closest('tr').find('td:contains("New"), td:contains("Categorized"), td:contains("Not pertinent")');
+				var pods_item_id = $(this).closest('tr').attr('id');
+				pods_item_id = window.parseInt(pods_item_id.replace('item-', ''));
 
-				var resource_id = $(this).closest('tr').attr('id');
-				resource_id = window.parseInt(resource_id.replace('item-', ''));
+				var el_to_change = $this.closest('tr').find('td[data-pods-field = ' + fields_to_change + ']');
 
 				$.ajax({
 					type: 'post',
 					url: window.ajaxurl,
 					data: {
-						action: 'quickedit_resource_pertinency',
-						nonce: resource_list_page_js_objects.pertinency_quickedit_nonce,
-						resource_id: resource_id
+						action: 'pods-quick-edit',
+						nonce: pods_list_page_data.pods_list_page_data_nonce,
+						pods_item_id: pods_item_id,
+						pods_name: pods_list_page_data.current_pods,
+						field: fields_to_change,
+						value: new_value
 					},
 					success: function(response){
-						if (response !== false){
-							status_item.text('Not pertinent');
+						console.log(response);
+						if (response.success !== false){
+							if(pods_list_page_data.current_pods === "resources") new_value = 'Not Pertinent';
+							el_to_change.text(new_value);
 						}
 					},
 					complete: function(){
@@ -74,8 +107,8 @@ jQuery(document).ready(function ($) {
 
 	opbg.set_admin_menu_icons();
 
-	if (pagenow === "toplevel_page_pods-manage-resources"){
-		opbg.quickedit_resource_pertinency();
+	if (pods_list_page_data.pods_manage_page_type === 'list'){
+		opbg.manage_pods_list_page();
 	}
 
 	// Convert urls in pods list pages table into links

@@ -17,52 +17,22 @@
 
 
 
-$post = new stdClass;
-$post->post_content = "<--excerpt-->Ho dovuto affrotare la nascita della figlia di una cara amica.. La nuova <b>gravidanza</b> della mia migliore amica... Per quanto felicissima.. Sappiamo tutte che dentro di noi tornano i ricordi e quei sentimenti... <--url--> http://forum.alfemminile.com/forum/perteenfant/__f129158_perteenfant-Ciao-amichette-mie-amour.html <--topics--> Gravidanza";
-$post->post_title = "Ciao amichette mie!!";
-$post->post_date = '2013-07-26 23:23:26';
+$labels = array("Title", "Pubblication Date", "Resource url", "Excerpt", "Status", "Topics", "Source", "Context", "Is correct?", "Resource type", "Comments?", "Social Networks");
 
-$resources = pods('resources');
+$fields = pods('resources')->find()->fields();
 
-$topics = pods('topics');
+$fields_names = array();
 
-$resource_data = array();
+foreach ($fields as $field) {
+	if(in_array($field['label'], $labels)){
+		$fields_names[] = $field['name'];
+	}
+}
 
-/* IFTTT post data parsing */
-
-$content = explode("\n", trim(preg_replace("/(<--[\w]*-->)/", "\n$1", $post->post_content)));
-
-foreach ($content as $field):
-	$buffer = array();
-	preg_match("/<--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
-	$buffer = array_map('trim', $buffer);
-	$resource_data[ $buffer[ 'key' ] ] = $buffer[ 'value' ];
-endforeach;
-
-/* Completing other post fields */
-
-$resource_data['title'] = $post->post_title;
-
-$resource_data['pub_time'] = date_create($post->post_date)->format('Y-m-d H:i:s');
-
-$resource_data['status'] = 1;
-
-// Transform the topic name in it's ID
-$topics->find(array('where' => array('name' => $resource_data['topics'] )))->fetch();
-$resource_data['topics'] = $topics->id();
-
-// Check if resource is existing, and return the source ID. If resource is already existing, false is returning
-$resource_data['source'] = opbg_is_resource_existing1($resource_data);
-
-// If duplicated, skip resource
-if ($resource_data['source'] === false):
-	// wp_delete_post( $post->ID, true );
-	bk1_debug::log('resource existing, exiting');
-	return false;
-endif;
-
-/* Save new entry */
-
-var_dump($resources->fetch($resources->add($resource_data)));
-
+var_dump(array_values(pods('resources')->pod_data['options']['ui_fields_manage']));
 ?>
+<script type="text/javascript">
+window.fields = <?php echo json_encode(pods('resources')->fields) ?>
+</script>
+
+
