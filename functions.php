@@ -17,7 +17,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
 
 /**** UTILITIES ****/
@@ -37,14 +37,26 @@ function is_pods_detail_page($pods = ''){
 
 	$page_query = parse_url(pods_current_url());
 
+	bk1_debug::log($page_query);
+
 	$parsed_page_query = wp_parse_args($page_query['query']);
 
-	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND $parsed_page_query['action'] === 'edit';
+	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND @$parsed_page_query['action'] === 'edit';
+}
+
+function is_pods_list_page($pods = ''){
+	global $pagenow;
+
+	$page_query = parse_url(pods_current_url());
+
+	$parsed_page_query = wp_parse_args($page_query['query']);
+
+	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND @$parsed_page_query['action'] !== 'edit';
 }
 
 /* CSS AND JAVASCRIPTS */
 
-add_action( 'admin_init', function() {
+add_action( 'admin_enqueue_scripts', function() {
 	global $pagenow;
 
 	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
@@ -56,9 +68,13 @@ add_action( 'admin_init', function() {
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
 	}
 	
-	if (is_pods_detail_page()){
+	if ($pagenow === 'admin.php' AND is_pods_detail_page()){
 		bk1_debug::log('enqueuing ScrollToFixed.js');
 		wp_enqueue_script('ScrollToFixed', get_stylesheet_directory_uri().'/js/ScrollToFixed.js', array('jquery'), false, true);
+	}
+
+	if ($pagenow === 'admin.php' AND is_pods_list_page('resources')){
+		wp_localize_script( 'opbg_admin', 'resource_list_page_js_objects', array('pertinency_quickedit_nonce' => wp_create_nonce( 'pertinency_quickedit_nonce')) );
 	}
 });
 
@@ -110,6 +126,36 @@ add_action( 'admin_menu', function(){
 
 /**** ACTIONS AND FILTERS ****/
 
+// Redirect to admin on login
+add_filter( 'login_redirect', function($redirect_to, $request, $user){
+	return admin_url().'index.php';
+}, 10, 3);
+
+
+add_filter( 'xmlrpc_enabled', function($enabled){
+
+	return get_option( 'remote_resources_fetching_status', false );
+});
+
+add_filter( 'heartbeat_received', function($response, $data){
+	global $pagenow;
+	// Make sure we only run our query if the proper key is present
+	//bk1_debug::log('heartbeat_received');
+    if( $pagenow === 'index.php' AND $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
+    	if ( get_option('are_new_resources', false) ){
+	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
+	    	bk1_debug::log('sending resources upgrade');
+	    	bk1_debug::log($response);
+	    	update_option('are_new_resources', false);
+    	}
+    }
+
+    //bk1_debug::log('sending heartbeat response');
+
+    return $response;
+
+}, 10, 2 );
+
 // On post creation through ifttt call post to resource converter
 add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('wp_insert_post called!');
@@ -121,15 +167,20 @@ add_action( 'wp_insert_post', function($post_id, $post){
 	}
 }, 10, 2);
 
-// Redirect to admin on login
-add_filter( 'login_redirect', function($redirect_to, $request, $user){
-	return admin_url().'index.php';
-}, 10, 3);
+/**** AJAX ****/
 
+add_action( 'wp_ajax_quickedit_resource_pertinency', function() {
+	if ( !wp_verify_nonce( $_REQUEST['nonce'], "pertinency_quickedit_nonce")) {
+		exit("No naughty business please");
+	}
 
-add_filter( 'xmlrpc_enabled', function($enabled){
+	$success = pods('resources', $_REQUEST['resource_id'])->save('status', 0);
 
-	return get_option( 'remote_resources_fetching_status', false );
+	header( "Content-Type: application/json" );
+
+	echo json_encode($success);
+
+	die();
 });
 
 add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
@@ -162,24 +213,6 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 	die();
 
 });
-
-add_filter( 'heartbeat_received', function($response, $data){
-	// Make sure we only run our query if the proper key is present
-	//bk1_debug::log('heartbeat_received');
-    if( $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
-    	if ( get_option('are_new_resources', false) ){
-	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
-	    	bk1_debug::log('sending resources upgrade');
-	    	bk1_debug::log($response);
-	    	update_option('are_new_resources', false);
-    	}
-    }
-
-    //bk1_debug::log('sending heartbeat response');
-
-    return $response;
-
-}, 10, 2 );
 
 /*
 add_action( 'xmlrpc_call', function($post){
@@ -278,7 +311,7 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log('source blacklisted paths:');
 		bk1_debug::log($blacklisted);
 
-		if (!empty(trim($blacklisted)):
+		if (!empty($blacklisted)):
  
 			if ($blacklisted === '*'):
 				bk1_debug::log('Whole site is blacklisted');
