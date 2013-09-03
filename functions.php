@@ -10,14 +10,14 @@
 //   define('WP_DEBUG_DISPLAY', false);
 // }
 
-ini_set('log_errors', 'off');      // log to file (yes)
+ini_set('log_errors', 'on');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 /**** UTILITIES ****/
@@ -37,14 +37,36 @@ function is_pods_detail_page($pods = ''){
 
 	$page_query = parse_url(pods_current_url());
 
+	bk1_debug::log($page_query);
+
 	$parsed_page_query = wp_parse_args($page_query['query']);
 
-	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND $parsed_page_query['action'] === 'edit';
+	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND @$parsed_page_query['action'] === 'edit';
+}
+
+function is_pods_list_page($pods = ''){
+	global $pagenow;
+
+	$page_query = parse_url(pods_current_url());
+
+	$parsed_page_query = wp_parse_args($page_query['query']);
+
+	return $pagenow === 'admin.php' AND strpos($parsed_page_query['page'], 'pods-manage-'.$pods) !== false AND @$parsed_page_query['action'] !== 'edit';
+}
+
+function get_current_admin_page_pod(){
+	global $pagenow;
+
+	$page_query = parse_url(pods_current_url());
+
+	$parsed_page_query = wp_parse_args($page_query['query']);
+
+	return str_replace('pods-manage-', '', $parsed_page_query['page']);
 }
 
 /* CSS AND JAVASCRIPTS */
 
-add_action( 'admin_init', function() {
+add_action( 'admin_enqueue_scripts', function() {
 	global $pagenow;
 
 	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
@@ -55,11 +77,38 @@ add_action( 'admin_init', function() {
 		bk1_debug::log('enqueuing admin_dashboard.js');
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
 	}
-	
-	if (is_pods_detail_page()){
+
+
+	if ($pagenow === 'admin.php' AND is_pods_detail_page()){
 		bk1_debug::log('enqueuing ScrollToFixed.js');
 		wp_enqueue_script('ScrollToFixed', get_stylesheet_directory_uri().'/js/ScrollToFixed.js', array('jquery'), false, true);
+		$pods_manage_page_type = 'detail';
 	}
+
+	if ($pagenow === 'admin.php' AND is_pods_list_page()){
+
+		$pods_manage_page_type = 'list';
+	}
+	
+	bk1_debug::log(get_current_admin_page_pod());
+
+	$current_pods_name = get_current_admin_page_pod();
+
+	$current_pods = pods( $current_pods_name );
+
+	$list_fields_manage = array_values($current_pods->pod_data['options']['ui_fields_manage']);
+
+	$fields = array_keys($current_pods->fields);
+
+	wp_localize_script( 'opbg_admin', 'pods_list_page_data', array(
+		'pods_list_page_data_nonce' => wp_create_nonce( 'pods_list_page_data_nonce'),
+		'list_fields_manage' => $list_fields_manage,
+		'all_fields' => $fields,
+		'current_pods' => $current_pods_name,
+		'pods_manage_page_type' => $pods_manage_page_type
+		)
+	);
+	
 });
 
 /**** ADMIN CUSTOMIZATION ****/
@@ -110,6 +159,36 @@ add_action( 'admin_menu', function(){
 
 /**** ACTIONS AND FILTERS ****/
 
+// Redirect to admin on login
+add_filter( 'login_redirect', function($redirect_to, $request, $user){
+	return admin_url().'index.php';
+}, 10, 3);
+
+
+add_filter( 'xmlrpc_enabled', function($enabled){
+
+	return get_option( 'remote_resources_fetching_status', false );
+});
+
+add_filter( 'heartbeat_received', function($response, $data){
+	global $pagenow;
+	// Make sure we only run our query if the proper key is present
+	//bk1_debug::log('heartbeat_received');
+    if( $pagenow === 'index.php' AND $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
+    	if ( get_option('are_new_resources', false) ){
+	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
+	    	bk1_debug::log('sending resources upgrade');
+	    	bk1_debug::log($response);
+	    	update_option('are_new_resources', false);
+    	}
+    }
+
+    //bk1_debug::log('sending heartbeat response');
+
+    return $response;
+
+}, 10, 2 );
+
 // On post creation through ifttt call post to resource converter
 add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('wp_insert_post called!');
@@ -121,15 +200,42 @@ add_action( 'wp_insert_post', function($post_id, $post){
 	}
 }, 10, 2);
 
-// Redirect to admin on login
-add_filter( 'login_redirect', function($redirect_to, $request, $user){
-	return admin_url().'index.php';
-}, 10, 3);
+/**** AJAX ****/
 
+add_action( 'wp_ajax_pods-quick-edit', function() {
+	if ( !wp_verify_nonce( $_REQUEST['nonce'], "pods_list_page_data_nonce")) {
+		exit("No naughty business please");
+	}
 
-add_filter( 'xmlrpc_enabled', function($enabled){
+	bk1_debug::log($_REQUEST);
 
-	return get_option( 'remote_resources_fetching_status', false );
+	$pods_item = pods($_REQUEST['pods_name'], $_REQUEST['pods_item_id']);
+
+	$success = $pods_item->save($_REQUEST['field'], $_REQUEST['value']);
+
+	$response = array();
+
+	bk1_debug::log($pods_item->find()->fetch($success));
+
+	if($success !== false){
+		//$pods_item->find()->fetch($_REQUEST['pods_item_id']);
+		$response['success'] = true;
+		$response['value'] = $pods_item->display($_REQUEST['field']);
+		if ($_REQUEST['pods_name'] === 'resources'){
+			//$statuses = ['Not Pertinent']
+		}
+	}
+	else{
+		$response['success'] = false;
+	}
+
+	bk1_debug::log($response);
+
+	header( "Content-Type: application/json" );
+
+	echo json_encode($response);
+
+	die();
 });
 
 add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
@@ -162,24 +268,6 @@ add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
 	die();
 
 });
-
-add_filter( 'heartbeat_received', function($response, $data){
-	// Make sure we only run our query if the proper key is present
-	//bk1_debug::log('heartbeat_received');
-    if( $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
-    	if ( get_option('are_new_resources', false) ){
-	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
-	    	bk1_debug::log('sending resources upgrade');
-	    	bk1_debug::log($response);
-	    	update_option('are_new_resources', false);
-    	}
-    }
-
-    //bk1_debug::log('sending heartbeat response');
-
-    return $response;
-
-}, 10, 2 );
 
 /*
 add_action( 'xmlrpc_call', function($post){
@@ -278,7 +366,7 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log('source blacklisted paths:');
 		bk1_debug::log($blacklisted);
 
-		if (trim($blacklisted) !== ''):
+		if (!empty($blacklisted)):
  
 			if ($blacklisted === '*'):
 				bk1_debug::log('Whole site is blacklisted');
@@ -287,11 +375,17 @@ function opbg_is_resource_existing($resource_data){
 
 				$blacklisted = explode("\n", $blacklisted);
 
+				bk1_debug::log($blacklisted);
+				
 				foreach ($blacklisted as $path) {
-					$path = trim($trim);
+					$path = trim($path);
+					bk1_debug::log($path);
 					if ($path[0] !== '/') $path = '/'.$path;
+					bk1_debug::log($path);
 					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
-					bk1_debug::log($host);
+					bk1_debug::log($path);
+
+					bk1_debug::log($host.$path);
 					if (strpos($resource_data['url'], $host.$path) !== false){
 						bk1_debug::log('This page is blacklisted');
 						return false;
