@@ -88,27 +88,28 @@ add_action( 'admin_enqueue_scripts', function() {
 	if ($pagenow === 'admin.php' AND is_pods_list_page()){
 
 		$pods_manage_page_type = 'list';
+
+		bk1_debug::log(get_current_admin_page_pod());
+
+		$current_pods_name = get_current_admin_page_pod();
+
+		$current_pods = pods( $current_pods_name );
+
+		$list_fields_manage = array_values($current_pods->pod_data['options']['ui_fields_manage']);
+
+		$fields = array_keys($current_pods->fields);
+
+		wp_localize_script( 'opbg_admin', 'pods_list_page_data', array(
+			'pods_list_page_data_nonce' => wp_create_nonce( 'pods_list_page_data_nonce'),
+			'list_fields_manage' => $list_fields_manage,
+			'all_fields' => $fields,
+			'current_pods' => $current_pods_name,
+			'pods_manage_page_type' => $pods_manage_page_type
+			)
+		);
+
 	}
-	
-	bk1_debug::log(get_current_admin_page_pod());
 
-	$current_pods_name = get_current_admin_page_pod();
-
-	$current_pods = pods( $current_pods_name );
-
-	$list_fields_manage = array_values($current_pods->pod_data['options']['ui_fields_manage']);
-
-	$fields = array_keys($current_pods->fields);
-
-	wp_localize_script( 'opbg_admin', 'pods_list_page_data', array(
-		'pods_list_page_data_nonce' => wp_create_nonce( 'pods_list_page_data_nonce'),
-		'list_fields_manage' => $list_fields_manage,
-		'all_fields' => $fields,
-		'current_pods' => $current_pods_name,
-		'pods_manage_page_type' => $pods_manage_page_type
-		)
-	);
-	
 });
 
 /**** ADMIN CUSTOMIZATION ****/
@@ -207,7 +208,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 		exit("No naughty business please");
 	}
 
-	bk1_debug::log($_REQUEST);
+	//bk1_debug::log($_REQUEST);
 
 	$pods_item = pods($_REQUEST['pods_name'], $_REQUEST['pods_item_id']);
 
@@ -215,7 +216,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 
 	$response = array();
 
-	bk1_debug::log($pods_item->find()->fetch($success));
+	//bk1_debug::log($pods_item->find()->fetch($success));
 
 	if($success !== false){
 		//$pods_item->find()->fetch($_REQUEST['pods_item_id']);
@@ -229,7 +230,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 		$response['success'] = false;
 	}
 
-	bk1_debug::log($response);
+	//bk1_debug::log($response);
 
 	header( "Content-Type: application/json" );
 
@@ -277,7 +278,7 @@ add_action( 'xmlrpc_call', function($post){
 
 });*/
 
-/**** PODS FUNCTIONS ****/
+/**** PODS HOOKS ****/
 
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
 add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
@@ -297,6 +298,73 @@ add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, 
 	endif;
 
 }, 10, 3);
+
+// If site/page is blacklisted, set all new resources with that url as non pertinent
+add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
+
+	$source	= pods('sources', $id);
+
+
+	if (!in_array('blacklisted', $pieces['fields_active'], true)){
+		bk1_debug::log('blacklist not in pieces');
+		return false;
+	}
+
+	$old_blacklist = $source->field('blacklisted');
+
+	$new_blacklist = $pieces['fields']['blacklisted']['value'];
+
+	/*if ($new_blacklist === $old_blacklist){
+		bk1_debug::log('blacklist not changed');
+		return false;
+	}*/
+
+	$resource = pods('resources')->find(array("limit" => -1, 'where' => array('status = 1 AND source.id = '.$id)));
+
+	bk1_debug::log('New blacklist: '.$new_blacklist);
+
+	if ($resource->total() === 0){
+		bk1_debug::log('No uncategorized resources with this source');
+		return false;
+	}
+
+	$new_blacklist = explode("\n", $new_blacklist);
+
+	$host = opbg_sanitize_host_url($source->field('url'));
+
+	while($resource->fetch()):
+
+		if (in_array('*', $new_blacklist, true)){
+			$resource->save('status', 0);
+			bk1_debug::log('Whole site is blacklisted');
+		}
+		else{
+
+			foreach ($new_blacklist as $path):
+				$path = trim($path);
+
+			if ($path[0] !== '/') $path = '/'.$path;
+
+			if (substr($path, -1) === '/') $path = substr($path, 0, -1);
+
+			bk1_debug::log('resource url: '. $resource->field('url'));
+			bk1_debug::log('blacklist url: '. $host.$path);
+
+			if (strpos($resource->field('url'), $host.$path) !== false){
+				$resource->save('status', 0);
+				bk1_debug::log('This resource is blacklisted');
+			}
+			else {
+				bk1_debug::log('This resource is safe');
+			}
+			endforeach;
+		}
+
+	endwhile;
+
+}, 10, 3);
+
+/**** PODS FUNCTIONS ****/
 
 // Get a summary of resurces for every topic
 function opbg_get_resource_summary($sorted_by = false ){
@@ -367,7 +435,7 @@ function opbg_is_resource_existing($resource_data){
 		bk1_debug::log($blacklisted);
 
 		if (!empty($blacklisted)):
- 
+
 			if ($blacklisted === '*'):
 				bk1_debug::log('Whole site is blacklisted');
 				return false; // The whole site is blacklisted
@@ -376,16 +444,14 @@ function opbg_is_resource_existing($resource_data){
 				$blacklisted = explode("\n", $blacklisted);
 
 				bk1_debug::log($blacklisted);
-				
+
 				foreach ($blacklisted as $path) {
 					$path = trim($path);
-					bk1_debug::log($path);
-					if ($path[0] !== '/') $path = '/'.$path;
-					bk1_debug::log($path);
-					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
-					bk1_debug::log($path);
 
-					bk1_debug::log($host.$path);
+					if ($path[0] !== '/') $path = '/'.$path;
+
+					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
+
 					if (strpos($resource_data['url'], $host.$path) !== false){
 						bk1_debug::log('This page is blacklisted');
 						return false;
@@ -465,7 +531,7 @@ function opbg_add_new_resource_from_post($post){
 
     bk1_debug::log('log post content');
 	bk1_debug::log($content);
-    
+
 	foreach ($content as $field):
 		$buffer = array();
 		preg_match("/<\s*--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
@@ -484,7 +550,7 @@ function opbg_add_new_resource_from_post($post){
 	// Transform the topic name in it's ID
 	$topics->find(array('where' => array('name' => $resource_data['topics'] )))->fetch();
 	$resource_data['topics'] = $topics->id();
-	
+
 	bk1_debug::log('Resource parsed prior source check');
 	bk1_debug::log($resource_data);
 
