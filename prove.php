@@ -30,9 +30,18 @@ foreach ($fields as $field) {
 }
 
 var_dump(array_values(pods('resources')->pod_data['options']['ui_fields_manage']));
+
+
+
 ?>
 <script type="text/javascript">
-window.fields = <?php echo json_encode(pods('resources')->fields) ?>
+<?php
+foreach ($new_arr as $key => $value) {
+	$key = str_replace(' ', '_', $key);
+	$key = strtolower($key);
+	echo 'window.'.$key.' = '.$value." \n";
+}
+?>
 </script>
 
 
