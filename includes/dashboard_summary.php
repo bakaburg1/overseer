@@ -20,7 +20,7 @@ function build_dashboard_summary(){
 
 		$filtering_p_text = $filtering_status ? "Sampling is on at the ".get_option( 'sampling_threshold')."%!" : "Sampling is off!";
 
-		bk1_debug::log($fetch_status);
+		bk1_debug::log('fetch status: '.$fetch_status);
 
 		?>
 		<div class="bootstrap-wpadmin">
