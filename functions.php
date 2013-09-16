@@ -2,23 +2,26 @@
 
 /**** SETUP ****/
 
-//ini_set('error_reporting', E_ALL & ~E_NOTICE);
-//ini_set('error_log', '/path/to/my/php.log');
-// define('WP_DEBUG', true);
-// if (WP_DEBUG) {
-//   define('WP_DEBUG_LOG', true);
-//   define('WP_DEBUG_DISPLAY', false);
-// }
+ini_set('error_reporting', E_ALL & ~E_NOTICE);
+define('WP_DEBUG', true);
+if (WP_DEBUG) {
+  define('WP_DEBUG_LOG', true);
+  define('WP_DEBUG_DISPLAY', false);
+}
 
-ini_set('log_errors', 'on');      // log to file (yes)
+ini_set('log_errors', 'off');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
+
+add_action( 'init', function(){
+	update_option('sampling_threshold', 25);
+});
 
 /**** UTILITIES ****/
 
@@ -62,6 +65,30 @@ function get_current_admin_page_pod(){
 	$parsed_page_query = wp_parse_args($page_query['query']);
 
 	return str_replace('pods-manage-', '', $parsed_page_query['page']);
+}
+
+function opbg_log_database_status($action){
+	$new_line = array(
+            'action_performed'      => $action,
+            'date'                  => date('r'),
+            'fetching_status'       => get_option( 'resources_fetching_status', false),
+            'filtering_status'      => get_option( 'resource_filtering_status', false),
+            'sampling_threshold'	=> get_option( 'sampling_threshold'),
+            'resources_status'      => opbg_get_resource_summary()
+		);
+
+	if (get_option('opbg_database_log', false) !== false){
+		$log = get_option('opbg_database_log');
+
+		$log[] = $new_line;
+
+		//bk1_debug::log($log);
+
+		update_option( 'opbg_database_log', $log );
+	}
+	else {
+		add_option( 'opbg_database_log', array($new_line) );
+	}
 }
 
 /* CSS AND JAVASCRIPTS */
@@ -166,10 +193,10 @@ add_filter( 'login_redirect', function($redirect_to, $request, $user){
 }, 10, 3);
 
 
-add_filter( 'xmlrpc_enabled', function($enabled){
+/*add_filter( 'xmlrpc_enabled', function($enabled){
 
 	return get_option( 'remote_resources_fetching_status', false );
-});
+});*/
 
 add_filter( 'heartbeat_received', function($response, $data){
 	global $pagenow;
@@ -197,7 +224,12 @@ add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
 	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
 	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
-		opbg_add_new_resource_from_post($post);
+		if (get_option( 'resources_fetching_status', false ) === true){
+			opbg_add_new_resource_from_post($post);
+		}
+		else {
+			wp_delete_post($post_id, true);
+		}
 	}
 }, 10, 2);
 
@@ -239,30 +271,56 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 	die();
 });
 
-add_action( 'wp_ajax_remote_resources_fetching_toggle', function(){
+add_action( 'wp_ajax_dashboard_widget_control', function(){
 
-	if ( !wp_verify_nonce( $_REQUEST['nonce'], "remote_resource_fetching_toggle_nonce")) {
+	if ( !wp_verify_nonce( $_REQUEST['nonce'], "dashboard_widget_control_nonce")) {
       exit("No naughty business please");
 	}
 
 	bk1_debug::log('toggling resource fetching');
+	bk1_debug::log($_REQUEST);
 
 	$success = false;
 
-	if ( $_REQUEST['remote_resources_fetching_status'] === 'off'){
-		$success = update_option( 'remote_resources_fetching_status', false );
+	//remote_resources_fetching_status
+	if ($_REQUEST['button_id'] === 'remote-fetching-toggle'){
 
-		$status = 'inactive';
+		if ( $_REQUEST['message'] === 'off'){
+			$success = update_option( 'resources_fetching_status', false );
+
+			$status = 'inactive';
+		}
+		elseif ( $_REQUEST['message'] === 'on'){
+			$success = update_option( 'resources_fetching_status', true );
+
+			bk1_debug::log($success);
+
+			$status = 'active';
+		}
+
+		opbg_log_database_status('toggled fetching');
 	}
-	elseif ( $_REQUEST['remote_resources_fetching_status'] === 'on'){
-		$success = update_option( 'remote_resources_fetching_status', true );
+	if ($_REQUEST['button_id'] === 'resource-filtering-toggle'){
 
-		$status = 'active';
+		if ( $_REQUEST['message'] === 'off'){
+			$success = update_option( 'resource_filtering_status', false );
+
+			$status = 'inactive';
+		}
+		elseif ( $_REQUEST['message'] === 'on'){
+			$success = update_option( 'resource_filtering_status', true );
+
+			$status = 'active';
+		}
+
+		opbg_log_database_status('toggled filtering');
 	}
 
 	header( "Content-Type: application/json" );
 
 	$response = array('success' => $success, 'status' => $status);
+
+	bk1_debug::log($response);
 
 	echo json_encode($response);
 
@@ -518,6 +576,14 @@ function opbg_is_resource_existing($resource_data){
 function opbg_add_new_resource_from_post($post){
 
 	bk1_debug::log('converting the post '.$post->post_title);
+
+	if ($threshold = get_option( 'resource_filtering_status', false ) === true){
+		$max = 10000;
+		if (rand(0, $max) >= get_option( 'sampling_threshold')/100*$max ) {
+			bk1_debug::log('resource filtered out');
+			return false;
+		}
+	}
 
 	$resources = pods('resources');
 

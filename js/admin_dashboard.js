@@ -33,25 +33,49 @@ jQuery(document).ready(function ($) {
 	};
 
 	$(document).on('heartbeat-send', function(e, data) {
-        data.dashboard_heartbeat = 'upgrade_dashboard_summary';
-    });
+		data.dashboard_heartbeat = 'upgrade_dashboard_summary';
+	});
 
-    $(document).on( 'heartbeat-tick', function(e, data) {
+	$(document).on( 'heartbeat-tick', function(e, data) {
 		// Only proceed if our data is present
 		if ( ! data.dashboard_summary_data )
-            return;
+			return;
 
-        opbg.dashboard_summary_upgrade_status_values(data.dashboard_summary_data);
-    });
+		opbg.dashboard_summary_upgrade_status_values(data.dashboard_summary_data);
+	});
+
+	opbg.dashboard_summary_set_button_state = function(button){
+
+		var p = button.siblings('.status-text');
+
+		var state = button.data('status');
+		console.log(state);
+		if (state === true) {
+			p.html(p.data('status-active'));
+			button.html(button.data('status-active'));
+		}
+		else {
+			p.html(p.data('status-inactive'));
+			button.html(button.data('status-inactive'));
+		}
+	};
 
 	opbg.dashboard_summary_print_status_values();
 
-	dashboard_summary_widget.find('#remote-resource-fetching:not(.disabled)').on('click.resources_fetch', function(){
+	dashboard_summary_widget.find('.resources-control button:not(.disabled)').on('click.resources_control', function(){
 		console.log('toggling fetching');
-		var $this = $(this);
-		var fetch_status = $this.parent('.fetch-button').find('.fetching-status');
-		var nonce = $this.data('nonce');
-		var message = $this.hasClass('active') ? "off" : "on";
+        var $this       = $(this);
+        var nonce       = dashboard_summary_widget.find('#dashboard-nonce').val();
+        var button_id   = $this.attr('id');
+        var message     = $this.data('status') ? "off" : "on";
+
+		console.log({
+			'action':       "dashboard_widget_control",
+			'nonce':        nonce,
+			'button_id':    button_id,
+			'message':      message
+
+		});
 
 		$this.addClass('disabled').text('wait...');
 
@@ -59,92 +83,36 @@ jQuery(document).ready(function ($) {
 			type:	"post",
 			url:	ajaxurl,
 			data:	{
-				action: "remote_resources_fetching_toggle",
-				nonce: nonce,
-				remote_resources_fetching_status: message
+                'action':       "dashboard_widget_control",
+                'nonce':        nonce,
+                'button_id':    button_id,
+                'message':      message
 			},
 			success: function(response) {
 				if (response.success === true){
 					if (response.status === "active"){
-						$this.addClass('active');
-						$this.empty().text($this.data('status-active-text'));
-						fetch_status.empty().text(fetch_status.data('status-active-text')).append($('<i>').addClass('icon-spin icon-refresh'));
+						$this.data('status', true);
+
 					}
 					else{
-						$this.removeClass('active');
-						$this.empty().text($this.data('status-inactive-text'));
-						fetch_status.empty().text(fetch_status.data('status-inactive-text'));
+						$this.data('status', false);
 					}
 				}
 				else {
+					console.log(response);
 					alert('Some server error occurred...');
-					$this.html(old_html);
+					//$this.html(old_html);
 				}
 			},
 			error: function(response){
+				console.log(response);
 				alert('Some connection error occurred...');
-				$this.html(old_html);
 			},
 			complete: function(response){
 				$this.removeClass('disabled');
+				opbg.dashboard_summary_set_button_state($this);
 			}
 		});
 
 	});
 });
-
-/* Resource fetching routine (deprecated)
-	dashboard_summary_widget.find('#resources-fetch:not(.disabled)').on('click.resources_fetch', function(){
-		var $this = $(this);
-		var nonce = $this.data('nonce');
-		var old_html = $this.html();
-		var loading_text = $this.data('loading-text');
-		var fetched_results = dashboard_summary_widget.find('.fetched-results');
-
-		$this.addClass('disabled');
-
-		$this.text($this.data('loading-text') + ' ');
-		$this.append($('<i>').addClass('icon-spin icon-refresh'));
-		fetched_results.fadeOut(200);
-
-		$.ajax({
-			type:	"post",
-			url:	ajaxurl,
-			data:	{action: "fetch_new_resources", nonce: nonce},
-			success: function(response) {
-				window.ajaxRes = response;
-				if (response.success === true) {
-					if (response.new_results > 0){
-						var recatd_msg = '';
-
-						if (response.recatd > 0)
-							recatd_msg = 'and <span class="old">' + response.recatd + '</span> were found under more topics';
-
-						fetched_results.html('<span class="new">' + response.new_results + '</span> new resource' + (response.new_results > 1 ? 's' : '') + ' were found' + recatd_msg + ' in ' + response.duration + '!');
-
-						opbg.dashboard_summary_upgrade_status_values(response.summary);
-					}
-					else {
-						var recatd_msg = '.';
-						console.log(response.recatd);
-						if (response.recatd > 0)
-							recatd_msg = ', but <span class="old">' + response.recatd + '</span> of the old ones were found under new topics!';
-
-						fetched_results.html('Whoops! There are no new resources' + recatd_msg);
-					}
-				}
-				else {
-					fetched_results.text('Some server error occurred...');
-				}
-			},
-			error:		function(response){
-				window.ajaxRes = response;
-				fetched_results.text('Some connection error occurred...');
-			},
-			complete:	function(response){
-				fetched_results.append($('<i>').addClass('icon-remove-sign')).fadeIn(200);
-				$this.removeClass('disabled').html(old_html);
-			}
-		});
-	});
-	*/
