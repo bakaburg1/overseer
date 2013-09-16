@@ -2,12 +2,12 @@
 
 /**** SETUP ****/
 
-ini_set('error_reporting', E_ALL & ~E_NOTICE);
+/*ini_set('error_reporting', E_ALL & ~E_NOTICE);
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
-}
+}*/
 
 ini_set('log_errors', 'off');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
@@ -16,7 +16,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
