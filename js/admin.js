@@ -107,7 +107,7 @@ jQuery(document).ready(function ($) {
 
 	opbg.set_admin_menu_icons();
 
-	if (pods_list_page_data.pods_manage_page_type === 'list'){
+	if (typeof pods_list_page_data !== 'undefined'  && pods_list_page_data.pods_manage_page_type === 'list'){
 		opbg.manage_pods_list_page();
 	}
 
