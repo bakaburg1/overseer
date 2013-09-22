@@ -1,3 +1,6 @@
+start
+<pre>
+
 <?php
 /**
  * Template Name: prova
@@ -15,33 +18,20 @@
  *
  */
 
+    /*$topics = opbg_get_resource_summary('topics');
 
+    $results = array();
 
-$labels = array("Title", "Pubblication Date", "Resource url", "Excerpt", "Status", "Topics", "Source", "Context", "Is correct?", "Resource type", "Comments?", "Social Networks");
+    foreach($topics as $topic=>$value){
+        $results[$topic] = $value['total'];
+    }
+    asort($results);
+    print_r($results);*/
 
-$fields = pods('resources')->find()->fields();
+    $resources = pods('resources')->find(array('where' => 't.status = ""'));
 
-$fields_names = array();
-
-foreach ($fields as $field) {
-	if(in_array($field['label'], $labels)){
-		$fields_names[] = $field['name'];
-	}
-}
-
-var_dump(array_values(pods('resources')->pod_data['options']['ui_fields_manage']));
-
-
-
+	echo $resources->total_found();
 ?>
-<script type="text/javascript">
-<?php
-foreach ($new_arr as $key => $value) {
-	$key = str_replace(' ', '_', $key);
-	$key = strtolower($key);
-	echo 'window.'.$key.' = '.$value." \n";
-}
-?>
-</script>
 
-
+</pre>
+finish
