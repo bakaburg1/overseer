@@ -16,7 +16,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
@@ -74,6 +74,9 @@ function opbg_log_database_status($action){
             'fetching_status'       => get_option( 'resources_fetching_status', false),
             'filtering_status'      => get_option( 'resource_filtering_status', false),
             'sampling_threshold'	=> get_option( 'sampling_threshold'),
+            'filtered_in_resources'	=> get_option( 'filtered_in_resources', 0),
+            'filtered_out_resources'=> get_option( 'filtered_out_resources', 0),
+            'arrived_ifttt_posts'   => get_option( 'arrived_ifttt_posts', 0),
             'resources_status'      => opbg_get_resource_summary()
 		);
 
@@ -195,7 +198,8 @@ add_filter( 'login_redirect', function($redirect_to, $request, $user){
 
 /*add_filter( 'xmlrpc_enabled', function($enabled){
 
-	return get_option( 'remote_resources_fetching_status', false );
+	bk1_debug::log($enabled);
+	return $enabled;
 });*/
 
 add_filter( 'heartbeat_received', function($response, $data){
@@ -224,13 +228,15 @@ add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
 	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
 	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
-		if (get_option( 'resources_fetching_status', false ) === true){
+	    update_option('arrived_ifttt_posts', get_option('arrived_ifttt_posts', 0) + 1);
+		if (get_option( 'resources_fetching_status', false )){
 			opbg_add_new_resource_from_post($post);
 		}
 		else {
 			wp_delete_post($post_id, true);
 		}
 	}
+	wp_delete_post($post_id, true);
 }, 10, 2);
 
 /**** AJAX ****/
@@ -299,6 +305,7 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 		}
 
 		opbg_log_database_status('toggled fetching');
+		update_option( 'arrived_ifttt_posts', 0);
 	}
 	if ($_REQUEST['button_id'] === 'resource-filtering-toggle'){
 
@@ -314,6 +321,8 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 		}
 
 		opbg_log_database_status('toggled filtering');
+		update_option('filtered_in_resources', 0);
+		update_option('filtered_out_resources', 0);
 	}
 
 	header( "Content-Type: application/json" );
@@ -577,11 +586,20 @@ function opbg_add_new_resource_from_post($post){
 
 	bk1_debug::log('converting the post '.$post->post_title);
 
-	if ($threshold = get_option( 'resource_filtering_status', false ) === true){
+	$is_filter_active = get_option( 'resource_filtering_status', false );
+
+	if ($is_filter_active){
 		$max = 10000;
-		if (rand(0, $max) >= get_option( 'sampling_threshold')/100*$max ) {
+		if (mt_rand(0, $max) >= get_option( 'sampling_threshold')/100*$max ) {
 			bk1_debug::log('resource filtered out');
+			$filtered_out = get_option('filtered_out_resources', 0);
+			update_option( 'filtered_out_resources', ++$filtered_out );
+			wp_delete_post( $post->ID, true );
 			return false;
+		}
+		else {
+			$filtered_in = get_option('filtered_in_resources', 0);
+			update_option( 'filtered_in_resources', ++$filtered_in );
 		}
 	}
 
@@ -636,11 +654,11 @@ function opbg_add_new_resource_from_post($post){
 	    bk1_debug::log('resource saved!');
 	    bk1_debug::log($resource_data);
 		update_option( 'are_new_resources', true );
-		wp_delete_post( $post->ID, true );
 	}else {
 	    bk1_debug::log('resource saving failed!');
 		wp_mail( get_option( 'admin_email' ), get_option( 'blogname' ).': There was a error saving the post into a resource', 'There was a error saving the post into a resource');
 	}
+	wp_delete_post( $post->ID, true );
 
 	return true;
 }
