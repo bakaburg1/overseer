@@ -232,11 +232,8 @@ add_action( 'wp_insert_post', function($post_id, $post){
 		if (get_option( 'resources_fetching_status', false )){
 			opbg_add_new_resource_from_post($post);
 		}
-		else {
-			wp_delete_post($post_id, true);
-		}
+		wp_delete_post($post_id, true);
 	}
-	wp_delete_post($post_id, true);
 }, 10, 2);
 
 /**** AJAX ****/
