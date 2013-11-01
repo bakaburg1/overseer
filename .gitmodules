@@ -1,9 +1,6 @@
 [submodule "bk1-wp-utils"]
 	path = deps/bk1-wp-utils
 	url = git@github.com:bakaburg1/bk1-wp-utils.git
-[submodule "prometheus"]
-	path = deps/prometheus
-	url = git@github.com:noeltock/prometheus.git
 [submodule "SEOstats"]
 	path = deps/SEOstats
 	url = https://github.com/eyecatchup/SEOstats.git
