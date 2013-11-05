@@ -26,6 +26,8 @@ jQuery(document).ready(function ($) {
 
 	// Upgrade resources status for summary dashboard widget
 	opbg.dashboard_summary_upgrade_status_values = function(data){
+		console.log(data);
+
 		for (var status in data){
 			dashboard_summary_widget.find('.status-table .value.status-' + status).data('status-value', data[status]);
 		}
@@ -46,28 +48,35 @@ jQuery(document).ready(function ($) {
 
 	opbg.dashboard_summary_set_button_state = function(button){
 
-		var p = button.siblings('.status-text');
+		console.log(button[0]);
+
+		var button_id = button.attr('id');
+
+		var p = button.closest('.toggle-filters').find('p[data-button-reference = ' + button_id +']');
 
 		var state = button.data('status');
+
 		console.log(state);
-		if (state === true) {
-			p.html(p.data('status-active'));
-			button.html(button.data('status-active'));
+
+		if (state === 1) {
+			p.find('span').text(p.data('threshold'));
+			button.addClass('active').find('span').text('Deactivate ');
 		}
-		else {
-			p.html(p.data('status-inactive'));
-			button.html(button.data('status-inactive'));
+		else if (state === 0) {
+			p.find('span').text('off');
+			button.removeClass('active').find('span').text('Activate ');
 		}
+		button.find('i').show();
 	};
 
 	opbg.dashboard_summary_print_status_values();
 
-	dashboard_summary_widget.find('.resources-control button:not(.disabled)').on('click.resources_control', function(){
+	dashboard_summary_widget.find('.resources-control').on('click.resources_control', 'button:not(.disabled)', function(){
 		console.log('toggling fetching');
-        var $this       = $(this);
-        var nonce       = dashboard_summary_widget.find('#dashboard-nonce').val();
-        var button_id   = $this.attr('id');
-        var message     = $this.data('status') ? "off" : "on";
+		var $this       = $(this);
+		var nonce       = dashboard_summary_widget.find('#dashboard-nonce').val();
+		var button_id   = $this.attr('id');
+		var message     = $this.data('status') ? "off" : "on";
 
 		console.log({
 			'action':       "dashboard_widget_control",
@@ -77,36 +86,36 @@ jQuery(document).ready(function ($) {
 
 		});
 
-		$this.addClass('disabled').text('wait...');
+		$this.addClass('disabled').find('span').text('wait...');
+		$this.find('i').hide();
 
 		$.ajax({
 			type:	"post",
 			url:	ajaxurl,
 			data:	{
-                'action':       "dashboard_widget_control",
-                'nonce':        nonce,
-                'button_id':    button_id,
-                'message':      message
+				'action':       "dashboard_widget_control",
+				'nonce':        nonce,
+				'button_id':    button_id,
+				'message':      message
 			},
 			success: function(response) {
 				if (response.success === true){
 					if (response.status === "active"){
-						$this.data('status', true);
-
+						$this.data('status', 1);
 					}
 					else{
-						$this.data('status', false);
+						$this.data('status', 0);
 					}
 				}
 				else {
 					console.log(response);
 					alert('Some server error occurred...');
-					//$this.html(old_html);
 				}
 			},
 			error: function(response){
 				console.log(response);
 				alert('Some connection error occurred...');
+				console.success = false;
 			},
 			complete: function(response){
 				$this.removeClass('disabled');
@@ -114,5 +123,56 @@ jQuery(document).ready(function ($) {
 			}
 		});
 
+		return false;
+
 	});
+
+	opbg.dashboard_summary_change_visualization_period = function(target){
+
+		var buttons = dashboard_summary_widget.find('.status-period-toggle');
+
+		var period	= target.data('toggle-option');
+		var nonce	= dashboard_summary_widget.find('#dashboard-nonce').val();
+		var cog		= buttons.find('.icon-cog');
+		var success	= false;
+
+		console.log(period);
+
+		cog.removeClass('hide');
+
+		buttons.find(' button').addClass('disabled');
+
+		$.ajax({
+			type:	"post",
+			url:	ajaxurl,
+			data:	{
+				'action':       "dashboard_widget_control",
+				'nonce':        nonce,
+				'button_id':    'status-period-toggle',
+				'message':      period
+			},
+			success: function(response) {
+				if (response.success === true){
+					opbg.dashboard_summary_upgrade_status_values(response.status);
+					success = true;
+				}
+				else {
+					alert('Some server error occurred...');
+				}
+			},
+			error: function(response){
+				alert('Some connection error occurred...');
+			},
+			complete: function(response){
+				cog.addClass('hide');
+				buttons.find('button').removeClass('disabled');
+
+				if (success) {
+					buttons.find('button').toggleClass('active');
+				}
+			}
+		});
+
+		return false;
+	};
 });

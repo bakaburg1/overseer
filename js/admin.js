@@ -120,16 +120,15 @@ jQuery(document).ready(function ($) {
     }
 
     // Implement automatic function calling on radio button toggle
-	$(".bootstrap-wpadmin .btn-group[data-toggle='buttons-radio'] button").on('click.button-toggle-radio', function(){
-		console.log(this);
-		var $this  = $(this);
-		if (!$this.hasClass('.active')){
+	$(".bootstrap-wpadmin .btn-group[data-toggle='buttons-radio']").on('click.button-toggle-radio', 'button:not(.disabled):not(.active)', function(){
+        var $this       = $(this);
+        var $callback   = $this.parent().data('toggle-function');
+
+		if (opbg[$callback]($this)){
 			$this.siblings().addBack().toggleClass('active');
-
-			var $callback = $this.parent().data('toggle-function');
-
-			opbg[$callback]();
 		}
+
+		return false;
 	});
 
 	// Implement message remove on x button push
