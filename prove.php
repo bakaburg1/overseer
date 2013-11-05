@@ -17,21 +17,23 @@ start
  * @since Twenty Twelve 1.0
  *
  */
+	/*
+	$topics = opbg_get_resource_summary('topics');
 
-    /*$topics = opbg_get_resource_summary('topics');
+	$results = array();
 
-    $results = array();
-
-    foreach($topics as $topic=>$value){
-        $results[$topic] = $value['total'];
-    }
-    asort($results);
-    print_r($results);*/
-
-    $resources = pods('resources')->find(array('where' => 't.status = ""'));
-
-	echo $resources->total_found();
+	foreach($topics as $topic=>$value){
+		$results[$topic] = $value['total'];
+	}
+	asort($results);
+	print_r($results);
+	*/
+	
+	delete_option('resource_filtering_status');
+	delete_option('filtered_in_resources');
+	delete_option('filtered_out_resources');
 ?>
+
 
 </pre>
 finish
