@@ -4,14 +4,22 @@
 /**
  * Template Name: report
  * @package WordPress
- * @subpackage Twenty_Twelve
- * @since Twenty Twelve 1.0
+ * @subpackage Overseer
  *
  */
+$resources_time_range = 'pub_time > "2013-11-01"';
 
-$resources_time_range = 'pub_time > "2013-09-01" AND pub_time < "2013-10-01"';
+$resources = pods('resources')->find(array('where' => $resources_time_range));
 
-$sources_time_range = 't.created > "2013-09-01" AND t.created < "2013-10-01"';
+echo 'Total pages november: '.$resources->total_found()."<br>";
+
+$resources_time_range = 'pub_time > "2013-11-01" AND pub_time < "2013-12-01"';
+
+$sources_time_range = 't.created > "2013-11-01" AND t.created < "2013-12-01"';
+
+$resources = pods('resources')->find(array('where' => $resources_time_range));
+
+echo 'Total pages in given period: '.$resources->total_found()."<br>";
 
 $resources = pods('resources')->find(array('where' => $resources_time_range.' AND status IN (0, 2)'));
 
