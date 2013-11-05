@@ -2,21 +2,21 @@
 
 /**** SETUP ****/
 
-/*ini_set('error_reporting', E_ALL & ~E_NOTICE);
+ini_set('error_reporting', E_ALL & ~E_NOTICE);
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
-}*/
+}
 
-ini_set('log_errors', 'off');      // log to file (yes)
+ini_set('log_errors', 'on');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
@@ -69,16 +69,16 @@ function get_current_admin_page_pod(){
 
 function opbg_log_database_status($action){
 	$new_line = array(
-            'action_performed'      => $action,
-            'date'                  => date('r'),
-            'fetching_status'       => get_option( 'resources_fetching_status', false),
-            'filtering_status'      => get_option( 'resource_filtering_status', false),
-            'sampling_threshold'	=> get_option( 'sampling_threshold'),
-            'filtered_in_resources'	=> get_option( 'filtered_in_resources', 0),
-            'filtered_out_resources'=> get_option( 'filtered_out_resources', 0),
-            'arrived_ifttt_posts'   => get_option( 'arrived_ifttt_posts', 0),
-            'resources_status'      => opbg_get_resource_summary()
-		);
+        'action_performed'      => $action,
+        'date'                  => date('r'),
+        'fetching_status'       => get_option( 'resources_fetching_status', false),
+        'sampling_status'      	=> get_option( 'resource_filtering_status', false),
+        'sampling_threshold'	=> pods('opbg_database_settings')->field('sampling_threshold'),
+        'sampled_in_resources'	=> get_option( 'sampled_in_resources', 0),
+        'sampled_out_resources'	=> get_option( 'sampled_out_resources', 0),
+        'arrived_ifttt_posts'   => get_option( 'arrived_ifttt_posts', 0),
+        'resources_status'      => opbg_get_resource_summary()
+	);
 
 	if (get_option('opbg_database_log', false) !== false){
 		$log = get_option('opbg_database_log');
@@ -274,14 +274,12 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 	die();
 });
 
+// Controller for ajax interactions in dashboard
 add_action( 'wp_ajax_dashboard_widget_control', function(){
 
 	if ( !wp_verify_nonce( $_REQUEST['nonce'], "dashboard_widget_control_nonce")) {
       exit("No naughty business please");
 	}
-
-	bk1_debug::log('toggling resource fetching');
-	bk1_debug::log($_REQUEST);
 
 	$success = false;
 
@@ -304,29 +302,64 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 		opbg_log_database_status('toggled fetching');
 		update_option( 'arrived_ifttt_posts', 0);
 	}
-	if ($_REQUEST['button_id'] === 'resource-filtering-toggle'){
+
+	elseif ($_REQUEST['button_id'] === 'sampling-filtering-toggle'){
+
+		bk1_debug::log('sampling-filtering-toggle');
 
 		if ( $_REQUEST['message'] === 'off'){
-			$success = update_option( 'resource_filtering_status', false );
+			$success = update_option( 'sampling_filtering_status', false );
+
+			$status = 'inactive';
+
+			bk1_debug::log('message off');
+			bk1_debug::log($success);
+		}
+		elseif ( $_REQUEST['message'] === 'on'){
+			$success = update_option( 'sampling_filtering_status', true );
+
+			$status = 'active';
+
+			bk1_debug::log('message on');
+			bk1_debug::log($success);
+		}
+
+		opbg_log_database_status('toggled filtering');
+		update_option('sampled_in_resources', 0);
+		update_option('sampled_out_resources', 0);
+	}
+
+	elseif ($_REQUEST['button_id'] === 'alexa-filtering-toggle'){
+
+		if ( $_REQUEST['message'] === 'off'){
+			$success = update_option( 'alexa_filtering_status', false );
 
 			$status = 'inactive';
 		}
 		elseif ( $_REQUEST['message'] === 'on'){
-			$success = update_option( 'resource_filtering_status', true );
+			$success = update_option( 'alexa_filtering_status', true );
 
 			$status = 'active';
 		}
 
 		opbg_log_database_status('toggled filtering');
-		update_option('filtered_in_resources', 0);
-		update_option('filtered_out_resources', 0);
+		update_option('alexa_in_resources', 0);
+		update_option('alexa_out_resources', 0);
+	}
+
+	elseif ($_REQUEST['button_id'] === 'status-period-toggle') {
+		bk1_debug::log('period change toggled');
+
+		$status = opbg_get_resource_summary(false, $_REQUEST['message'] === month ? true : false);
+
+		$success = true;
 	}
 
 	header( "Content-Type: application/json" );
 
 	$response = array('success' => $success, 'status' => $status);
 
-	bk1_debug::log($response);
+	//bk1_debug::log($response);
 
 	echo json_encode($response);
 
@@ -431,11 +464,13 @@ add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
 /**** PODS FUNCTIONS ****/
 
 // Get a summary of resurces for every topic
-function opbg_get_resource_summary($sorted_by = false ){
+function opbg_get_resource_summary($sorted_by = false, $last_month = false ){
 
 	$resources 	= pods('resources');
 
 	$response 	= array();
+
+	if ($last_month === true) $start = date("Y-m-01");
 
 	if ($sorted_by != false):
 		$taxonomy = pods($sorted_by, array('limit' => -1));
@@ -464,14 +499,25 @@ function opbg_get_resource_summary($sorted_by = false ){
 
 			endwhile;
 		endif;
-	else:
+	elseif ($last_month === true):
+		bk1_debug::log('generating resource summary this month');
+		$response['total'] = $resources->find(array('where' => "pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+
+		$response['new'] = $resources->find(array('where' => "status = 1 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+
+		$response['categorized'] = $resources->find(array('where' => "status = 2 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+
+		$response['excluded'] = $resources->find(array('where' => "status = 0 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+
+	elseif ($last_month === false):
+		bk1_debug::log('generating resource summary total');
 		$response['total'] = $resources->find()->total_found();
 
-		$response['new'] = $resources->find(array('where' => array('status' => 1) ) )->total_found();
+		$response['new'] = $resources->find(array('where' => "status = 1", 'expires' => 60) )->total_found();
 
-		$response['categorized'] = $resources->find(array('where' => array('status' => 2) ) )->total_found();
+		$response['categorized'] = $resources->find(array('where' => "status = 2", 'expires' => 60) )->total_found();
 
-		$response['excluded'] = $resources->find(array('where' => array('status' => 0) ) )->total_found();
+		$response['excluded'] = $resources->find(array('where' => "status = 0", 'expires' => 60) )->total_found();
 	endif;
 
 	return $response;
@@ -658,6 +704,32 @@ function opbg_add_new_resource_from_post($post){
 	wp_delete_post( $post->ID, true );
 
 	return true;
+}
+
+function opbg_assign_alexa_score($source) {
+
+	if (isset($source)){
+		$url = $source->field('url');
+		$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
+		$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
+
+		$source->save('alexa', $grank);
+
+		return $grank;
+	}
+	else {
+
+		$sites = pods('sources')->find(array('limit' => -1, "where" => "alexa IS NULL"));
+
+		while($sites->fetch()){
+
+			$url = $sites->field('url');
+			$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
+			$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
+
+			$sites->save('alexa', $grank);
+		}
+	}
 }
 
 ?>
