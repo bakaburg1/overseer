@@ -243,7 +243,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 		exit("No naughty business please");
 	}
 
-	//bk1_debug::log($_REQUEST);
+	bk1_debug::log($_REQUEST);
 
 	$pods_item = pods($_REQUEST['pods_name'], $_REQUEST['pods_item_id']);
 
@@ -253,7 +253,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 
 	//bk1_debug::log($pods_item->find()->fetch($success));
 
-	if($success !== false){
+	if($success != false){
 		//$pods_item->find()->fetch($_REQUEST['pods_item_id']);
 		$response['success'] = true;
 		$response['value'] = $pods_item->display($_REQUEST['field']);
@@ -332,12 +332,12 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 	elseif ($_REQUEST['button_id'] === 'alexa-filtering-toggle'){
 
 		if ( $_REQUEST['message'] === 'off'){
-			$success = update_option( 'alexa_filtering_status', false );
+			$success = update_option( 'alexa_filtering_status');
 
 			$status = 'inactive';
 		}
 		elseif ( $_REQUEST['message'] === 'on'){
-			$success = update_option( 'alexa_filtering_status', true );
+			$success = update_option( 'alexa_filtering_status');
 
 			$status = 'active';
 		}
@@ -531,10 +531,19 @@ function opbg_is_resource_existing($resource_data){
 
 	$host		= opbg_sanitize_host_url($resource_data['url']);
 
-	bk1_debug::log($sources->find(array('limit' => 1, 'where' => array('url' => $host) ) )->fetch());
+	$sources->find(array('limit' => 1, 'where' => array('url' => $host) ) )->fetch();
+
+	$alexa_rank = opbg_generate_alexa_score($host);
+
+	if ($alexa_rank > pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank === 0){
+		bk1_debug::log('Filtered out by alexa score');
+		return false; // The whole site is blacklisted
+	}
 
 	// If source already exist
 	if ($sources->exists()):
+
+		opbg_assign_alexa_score($sources);
 
 		bk1_debug::log('source already exists');
 		//bk1_debug::log($sources->row());
@@ -619,6 +628,9 @@ function opbg_is_resource_existing($resource_data){
 		$source_id = $sources->add(array('url' => $host, 'topics' => $resource_data['topics'], 'is_pertinent' => 0) );
 		bk1_debug::log('source id: '.$source_id);
 		//bk1_debug::log(pods('sources')->fetch($source_id));
+
+		opbg_assign_alexa_score(pods('sources', $source_id));
+
 	endif;
 
 	return $source_id;
@@ -687,7 +699,7 @@ function opbg_add_new_resource_from_post($post){
 	// If duplicated, skip resource
 	if ($resource_data['source'] === false):
 		wp_delete_post( $post->ID, true );
-		bk1_debug::log('resource existing or blacklisted, exiting');
+		bk1_debug::log('resource existing, blacklisted or out of alexa threshold, exiting');
 		return false;
 	endif;
 
@@ -708,14 +720,11 @@ function opbg_add_new_resource_from_post($post){
 
 function opbg_assign_alexa_score($source) {
 
-	if (isset($source)){
-		$url = $source->field('url');
-		$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
-		$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
+	if (isset($source) AND $source->exist()){
 
-		$source->save('alexa', $grank);
+		$grank = opbg_generate_alexa_score($source->field('url'));
 
-		return $grank;
+		return $source->save('alexa', $grank);
 	}
 	else {
 
@@ -729,6 +738,18 @@ function opbg_assign_alexa_score($source) {
 
 			$sites->save('alexa', $grank);
 		}
+	}
+}
+
+function opbg_generate_alexa_score($url = false){
+	if ($url !== false){
+		$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
+		$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
+
+		return $grank;
+	}
+	else {
+		bk1_debug::log('No url to calculate alexa score.');
 	}
 }
 
