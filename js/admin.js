@@ -59,14 +59,14 @@ jQuery(document).ready(function ($) {
 				new_value = '*';
 			}
 
-			table_rows.on('click.pods_item_quick_edit', '.pods-quick-edit a', function() {
+			table_rows.on('click.pods_item_quick_edit', '.pods-quick-edit a:not(.disabled)', function() {
 				$this = $(this);
 
-				if ($this.hasClass('disabled')) return false;
+				//if ($this.hasClass('disabled')) return false;
 
 				$this.addClass('disabled');
 
-				$this.parent().append(' <i class="icon-spin icon-refresh"></i>');
+				$this.parent().append(' <i class="icon-spin icon-cog"></i>');
 
 				var loading = $this.siblings('i');
 
@@ -74,6 +74,16 @@ jQuery(document).ready(function ($) {
 				pods_item_id = window.parseInt(pods_item_id.replace('item-', ''));
 
 				var el_to_change = $this.closest('tr').find('td[data-pods-field = ' + fields_to_change + ']');
+
+				/*console.log("quick edit:");
+				console.log({
+					action: 'pods-quick-edit',
+					nonce: pods_list_page_data.pods_list_page_data_nonce,
+					pods_item_id: pods_item_id,
+					pods_name: pods_list_page_data.current_pods,
+					field: fields_to_change,
+					value: new_value
+				});*/
 
 				$.ajax({
 					type: 'post',
@@ -89,8 +99,7 @@ jQuery(document).ready(function ($) {
 					success: function(response){
 						console.log(response);
 						if (response.success !== false){
-							if(pods_list_page_data.current_pods === "resources") new_value = 'Not Pertinent';
-							el_to_change.text(new_value);
+							el_to_change.text(response.value);
 						}
 					},
 					complete: function(){
