@@ -2,14 +2,14 @@
 
 /**** SETUP ****/
 
-ini_set('error_reporting', E_ALL & ~E_NOTICE);
+/*ini_set('error_reporting', E_ALL & ~E_NOTICE);
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
-}
+}*/
 
-ini_set('log_errors', 'on');      // log to file (yes)
+ini_set('log_errors', 'off');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
@@ -251,14 +251,17 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 
 	$response = array();
 
-	//bk1_debug::log($pods_item->find()->fetch($success));
-
 	if($success != false){
-		//$pods_item->find()->fetch($_REQUEST['pods_item_id']);
 		$response['success'] = true;
-		$response['value'] = $pods_item->display($_REQUEST['field']);
-		if ($_REQUEST['pods_name'] === 'resources'){
-			//$statuses = ['Not Pertinent']
+
+		// Bug: needed a way to reset pod and show the new value
+		//$response['value'] = $pods_item->display($_REQUEST['field']);
+
+		if ($_REQUEST['pods_name'] == 'resources'){
+			$response['value'] = "Not Pertinent";
+		}
+		elseif ($_REQUEST['pods_name'] == 'sources'){
+			$response['value'] = "*";
 		}
 	}
 	else{
@@ -332,12 +335,12 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 	elseif ($_REQUEST['button_id'] === 'alexa-filtering-toggle'){
 
 		if ( $_REQUEST['message'] === 'off'){
-			$success = update_option( 'alexa_filtering_status');
+			$success = update_option( 'alexa_filtering_status', false);
 
 			$status = 'inactive';
 		}
 		elseif ( $_REQUEST['message'] === 'on'){
-			$success = update_option( 'alexa_filtering_status');
+			$success = update_option( 'alexa_filtering_status', true);
 
 			$status = 'active';
 		}

@@ -75,7 +75,7 @@ jQuery(document).ready(function ($) {
 
 				var el_to_change = $this.closest('tr').find('td[data-pods-field = ' + fields_to_change + ']');
 
-				/*console.log("quick edit:");
+				console.log("quick edit:");
 				console.log({
 					action: 'pods-quick-edit',
 					nonce: pods_list_page_data.pods_list_page_data_nonce,
@@ -83,7 +83,7 @@ jQuery(document).ready(function ($) {
 					pods_name: pods_list_page_data.current_pods,
 					field: fields_to_change,
 					value: new_value
-				});*/
+				});
 
 				$.ajax({
 					type: 'post',
