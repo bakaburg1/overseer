@@ -643,6 +643,7 @@ function opbg_add_new_resource_from_post($post){
 
 	$is_filter_active = get_option( 'resource_filtering_status', false );
 
+	// Random Sampling
 	if ($is_filter_active){
 		$max = 10000;
 		if (mt_rand(0, $max) >= get_option( 'sampling_threshold')/100*$max ) {
@@ -703,6 +704,11 @@ function opbg_add_new_resource_from_post($post){
 		return false;
 	endif;
 
+	// Check if keywords are present
+	$resource_data['keyword_matches'] = opbg_check_keywords_in_resource($resource_data['url']);
+
+	if ($resource_data['keyword_matches'] < 1) return false;
+
 	/* Save new entry */
 	bk1_debug::log('saving resource');
 	if ($resources->add($resource_data)){
@@ -751,6 +757,17 @@ function opbg_generate_alexa_score($url = false){
 	else {
 		bk1_debug::log('No url to calculate alexa score.');
 	}
+}
+
+function opbg_check_keywords_in_resource($url){
+	$response = wp_remote_get($url);
+
+	$the_body = wp_remote_retrieve_body($response);
+
+	$matches_count = preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body);
+
+	return $matches_count;
+
 }
 
 ?>
