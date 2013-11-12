@@ -1,7 +1,6 @@
-start
 <pre>
 
-	<?php
+<?php
 /**
  * Template Name: prova
  *
@@ -16,43 +15,106 @@ start
  * @subpackage Overseer
  *
  */
-	/*
-	$topics = opbg_get_resource_summary('topics');
 
-	$results = array();
+	ini_set('log_errors', 'on');      // log to file (yes)
+	ini_set('display_errors', 'on'); // log to screen (no)
 
-	foreach($topics as $topic=>$value){
-		$results[$topic] = $value['total'];
-	}
-	asort($results);
-	print_r($results);
-	*/
+/*
 
-	$resources = pods('resources')->find(array('limit' => -1));
+	$resources = pods('resources')->find(array('limit' => 20));
 
-	$results = array();
+	$reload = 0;
 
-	$i = 0;
+	echo "<div class='total'>".$resources->total_found()."</div>";
 
 	while($resources->fetch()){
 		$url = $resources->field('url');
+		$alexa_rank = ($resources->field('source.alexa') === '' OR  $resources->field('source.alexa') === null OR $resources->field('source.alexa') === false) ? false : (int)$resources->field('source.alexa');
+		$keywords = (int)$resources->field('keywords_matched');
 
-		$response = wp_remote_get($url);
+		//echo "$url\t$alexa\t$keywords\n";
+		//var_dump($resources->field('source.alexa'));
+		//var_dump($alexa_rank);
 
-		$the_body = wp_remote_retrieve_body($response);
+		if ($alexa_rank > pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank === 0) {
+			$resources->delete();
+			echo "Alexa score $alexa_rank, deleting\n";
+			$reload = 1;
+			continue;
+		}
 
-		if (preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body) === 0) {
-			$i++;
+		if ($keywords === 0){
+			echo "$keywords keywords found";
+
+			$matches = opbg_check_keywords_in_resource($url);
+
+			if ($matches >= 1){
+				$resources->save('keywords_matched', $matches);
+				echo ",$matches present, updating\n";
+			}
+			else {
+				$resources->delete();
+				echo ", deleting\n";
+				$reload = 1;
+			}
+			continue;
 		}
 	}
 
-	echo "Resources with no matches: ".$i;
+*/
 
-	delete_option('resource_filtering_status');
-	delete_option('filtered_in_resources');
-	delete_option('filtered_out_resources');
+	$sources = pods('sources', array('limit' => 30, "where" => "(resources.id IS NULL) OR (t.alexa NOT BETWEEN 1 AND 120000) OR (t.url IS NULL)"));
+
+	//$sources = pods('sources', array('limit' => 15, "where" => "(resources.id IS NULL)"));
+
+	echo "<div class='total'>".$sources->total_found()."</div>";
+
+	$total = $sources->total_found();
+
+	//echo "url\tresources\talexa\n";
+
+	while($sources->fetch()){
+		$url = $sources->field('url');
+		$resources = count($sources->field('resources'));
+		$alexa = $sources->field('alexa');
+
+		//echo "$url\t$resources\t$alexa\n";
+
+		$sources->delete();
+
+		//var_dump($sources->field('resources'));
+	}
+
 	?>
 
 
 </pre>
-finish
+<?php echo $sources->pagination( array( 'type' => 'paginate' ) ); ?>
+<script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+
+<script type="text/javascript">
+jQuery(document).ready(function ($) {
+
+	//link = $('.pods-pagination-paginate .next').attr('href');
+
+	console.log($('.total').text() !== "0");
+	console.log($('.reload').eq(0).text() === "1");
+
+	//reload = <?php echo $reload ?>;
+
+	//return false;
+
+	$total = <?php echo $total ?>;
+
+	if ($total !== 0) {
+
+		window.location = window.location
+
+		//if (reload === 1) window.location = window.location;
+		//else window.location = link;
+	}
+
+});
+
+</script>
+stop
