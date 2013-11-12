@@ -1,17 +1,22 @@
 <?php
 /**
- * The sidebar containing the main widget area.
+ * The sidebar containing the secondary widget area
  *
- * If no active widgets in sidebar, let's hide it completely.
+ * Displays on posts and pages.
+ *
+ * If no active widgets are in this sidebar, hide it completely.
  *
  * @package WordPress
- * @subpackage Twenty_Twelve
- * @since Twenty Twelve 1.0
+ * @subpackage Twenty_Thirteen
+ * @since Twenty Thirteen 1.0
  */
-?>
 
-	<?php if ( is_active_sidebar( 'sidebar-1' ) ) : ?>
-		<div id="secondary" class="widget-area" role="complementary">
-			<?php dynamic_sidebar( 'sidebar-1' ); ?>
-		</div><!-- #secondary -->
-	<?php endif; ?>
+if ( is_active_sidebar( 'sidebar-2' ) ) : ?>
+	<div id="tertiary" class="sidebar-container" role="complementary">
+		<div class="sidebar-inner">
+			<div class="widget-area">
+				<?php dynamic_sidebar( 'sidebar-2' ); ?>
+			</div><!-- .widget-area -->
+		</div><!-- .sidebar-inner -->
+	</div><!-- #tertiary -->
+<?php endif; ?>

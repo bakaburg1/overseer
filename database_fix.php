@@ -2,7 +2,7 @@
 
 <?php
 /**
- * Template Name: prova
+ * Template Name: database fix
  *
  * This is the most generic template file in a WordPress theme
  * and one of the two required files for a theme (the other being style.css).
@@ -16,8 +16,8 @@
  *
  */
 
-	ini_set('log_errors', 'on');      // log to file (yes)
-	ini_set('display_errors', 'on'); // log to screen (no)
+    ini_set('log_errors', 'on');      // log to file (yes)
+    ini_set('display_errors', 'on'); // log to screen (no)
 
 /*
 
@@ -117,4 +117,7 @@ jQuery(document).ready(function ($) {
 });
 
 </script>
+stop
+?>
+</pre>
 stop

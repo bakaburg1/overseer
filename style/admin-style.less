@@ -58,8 +58,25 @@
 }
 
 .bootstrap-wpadmin {
-	 hr {
+	hr {
 		margin: 10px 0;
+	}
+
+	.icon-spin {
+		.carved-text();
+		padding: 0;
+		margin: 0;
+		line-height: 1em !important;
+		color: #8F8F8F;
+	}
+
+	button.btn {
+		&.disabled {
+			cursor: wait;
+		}
+		&:focus {
+			outline: none;
+		}
 	}
 }
 
@@ -106,6 +123,12 @@
 				font-weight: bold;
 				font-family: 'helvetica neue', sans-serif;
 				font-size: 13px;
+			}
+		}
+		.status-period-toggle {
+			.btn-group{
+				float: left;
+				margin-right: 10px;
 			}
 		}
 		.separator.span12 {
