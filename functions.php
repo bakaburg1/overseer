@@ -2,12 +2,14 @@
 
 /**** SETUP ****/
 
-/*ini_set('error_reporting', E_ALL & ~E_NOTICE);
+/*
+ini_set('error_reporting', E_ALL & ~E_NOTICE);
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', false);
-}*/
+}
+*/
 
 ini_set('log_errors', 'off');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
@@ -16,7 +18,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
+bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
@@ -69,15 +71,15 @@ function get_current_admin_page_pod(){
 
 function opbg_log_database_status($action){
 	$new_line = array(
-        'action_performed'      => $action,
-        'date'                  => date('r'),
-        'fetching_status'       => get_option( 'resources_fetching_status', false),
-        'sampling_status'      	=> get_option( 'resource_filtering_status', false),
-        'sampling_threshold'	=> pods('opbg_database_settings')->field('sampling_threshold'),
-        'sampled_in_resources'	=> get_option( 'sampled_in_resources', 0),
-        'sampled_out_resources'	=> get_option( 'sampled_out_resources', 0),
-        'arrived_ifttt_posts'   => get_option( 'arrived_ifttt_posts', 0),
-        'resources_status'      => opbg_get_resource_summary()
+		'action_performed'      => $action,
+		'date'                  => date('r'),
+		'fetching_status'       => get_option( 'resources_fetching_status', false),
+		'sampling_status'      	=> get_option( 'resource_filtering_status', false),
+		'sampling_threshold'	=> pods('opbg_database_settings')->field('sampling_threshold'),
+		'sampled_in_resources'	=> get_option( 'sampled_in_resources', 0),
+		'sampled_out_resources'	=> get_option( 'sampled_out_resources', 0),
+		'arrived_ifttt_posts'   => get_option( 'arrived_ifttt_posts', 0),
+		'resources_status'      => opbg_get_resource_summary()
 	);
 
 	if (get_option('opbg_database_log', false) !== false){
@@ -147,8 +149,8 @@ add_action( 'admin_enqueue_scripts', function() {
 // Clean the Dashboard
 function opbg_dashboard_setup()
 {
-    // Globalize the metaboxes array, this holds all the widgets for wp-admin
-    global $wp_meta_boxes;
+	// Globalize the metaboxes array, this holds all the widgets for wp-admin
+	global $wp_meta_boxes;
 
 	unset($wp_meta_boxes['dashboard']);
 
@@ -161,7 +163,7 @@ add_action('wp_dashboard_setup', 'opbg_dashboard_setup', 100 );
 
 function opbg_admin_logo()
 {
-    echo '<style type="text/css">#header-logo { background-image: url('.get_stylesheet_directory_uri().'/images/opbg_alpha.png) !important; }</style>';
+	echo '<style type="text/css">#header-logo { background-image: url('.get_stylesheet_directory_uri().'/images/opbg_alpha.png) !important; }</style>';
 }
 add_action('admin_head', 'opbg_admin_logo');
 
@@ -171,12 +173,12 @@ function opbg_login_logo() { ?>
 add_action( 'login_enqueue_scripts', 'opbg_login_logo' );
 
 function opbg_login_logo_url() {
-    return wp_login_url( admin_url() );
+	return wp_login_url( admin_url() );
 }
 add_filter( 'login_headerurl', 'opbg_login_logo_url' );
 
 function opbg_login_logo_url_title() {
-    return '';
+	return '';
 }
 add_filter( 'login_headertitle', 'opbg_login_logo_url_title' );
 
@@ -206,18 +208,18 @@ add_filter( 'heartbeat_received', function($response, $data){
 	global $pagenow;
 	// Make sure we only run our query if the proper key is present
 	//bk1_debug::log('heartbeat_received');
-    if( $pagenow === 'index.php' AND $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
-    	if ( get_option('are_new_resources', false) ){
-	    	$response['dashboard_summary_data'] = opbg_get_resource_summary();
-	    	bk1_debug::log('sending resources upgrade');
-	    	bk1_debug::log($response);
-	    	update_option('are_new_resources', false);
-    	}
-    }
+	if( $pagenow === 'index.php' AND $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
+		if ( get_option('are_new_resources', false) ){
+			$response['dashboard_summary_data'] = opbg_get_resource_summary();
+			bk1_debug::log('sending resources upgrade');
+			bk1_debug::log($response);
+			update_option('are_new_resources', false);
+		}
+	}
 
-    //bk1_debug::log('sending heartbeat response');
+	//bk1_debug::log('sending heartbeat response');
 
-    return $response;
+	return $response;
 
 }, 10, 2 );
 
@@ -228,7 +230,7 @@ add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
 	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
 	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
-	    update_option('arrived_ifttt_posts', get_option('arrived_ifttt_posts', 0) + 1);
+		update_option('arrived_ifttt_posts', get_option('arrived_ifttt_posts', 0) + 1);
 		if (get_option( 'resources_fetching_status', false )){
 			opbg_add_new_resource_from_post($post);
 		}
@@ -281,7 +283,7 @@ add_action( 'wp_ajax_pods-quick-edit', function() {
 add_action( 'wp_ajax_dashboard_widget_control', function(){
 
 	if ( !wp_verify_nonce( $_REQUEST['nonce'], "dashboard_widget_control_nonce")) {
-      exit("No naughty business please");
+	  exit("No naughty business please");
 	}
 
 	$success = false;
@@ -672,7 +674,7 @@ function opbg_add_new_resource_from_post($post){
 
 	$content = explode("\n", trim(preg_replace("/(<\s*--[\w]*-->)/", "\n$1", html_entity_decode($post->post_content))));
 
-    bk1_debug::log('log post content');
+	bk1_debug::log('log post content');
 	bk1_debug::log($content);
 
 	foreach ($content as $field):
@@ -697,29 +699,27 @@ function opbg_add_new_resource_from_post($post){
 	bk1_debug::log('Resource parsed prior source check');
 	bk1_debug::log($resource_data);
 
-	// Check if resource is existing, and return the source ID. If resource is already existing, false is returning
+	// Check if keywords are present
+	$resource_data['keywords_matched'] = opbg_check_keywords_in_resource($resource_data['url']);
+	if (!($resource_data['keywords_matched'] >= 1)) return false;
+
+	// Check the source for duplicated, alexa ranking, blacklisting
 	$resource_data['source'] = opbg_is_resource_existing($resource_data);
 
-	// If duplicated, skip resource
 	if ($resource_data['source'] === false):
 		wp_delete_post( $post->ID, true );
 		bk1_debug::log('resource existing, blacklisted or out of alexa threshold, exiting');
 		return false;
 	endif;
 
-	// Check if keywords are present
-	$resource_data['keyword_matches'] = opbg_check_keywords_in_resource($resource_data['url']);
-
-	if ($resource_data['keyword_matches'] < 1) return false;
-
 	/* Save new entry */
 	bk1_debug::log('saving resource');
 	if ($resources->add($resource_data)){
-	    bk1_debug::log('resource saved!');
-	    bk1_debug::log($resource_data);
+		bk1_debug::log('resource saved!');
+		bk1_debug::log($resource_data);
 		update_option( 'are_new_resources', true );
 	}else {
-	    bk1_debug::log('resource saving failed!');
+		bk1_debug::log('resource saving failed!');
 		wp_mail( get_option( 'admin_email' ), get_option( 'blogname' ).': There was a error saving the post into a resource', 'There was a error saving the post into a resource');
 	}
 	wp_delete_post( $post->ID, true );
@@ -763,11 +763,32 @@ function opbg_generate_alexa_score($url = false){
 }
 
 function opbg_check_keywords_in_resource($url){
-	$response = wp_remote_get($url);
+
+	$error = true;
+
+	$i = 0;
+
+	while ($error === true AND $i < 4) {
+		$response = wp_remote_get($url);
+
+		$error = isset($response->errors['http_request_failed']);
+
+		bk1_debug::log('trial #'.($i+1)."\n");
+
+		$i++;
+	}
+
+	if ($error){
+		bk1_debug::log($response);
+		//var_dump($response);
+		return 0;
+	}
 
 	$the_body = wp_remote_retrieve_body($response);
 
-	$matches_count = preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body);
+	$matches = array();
+
+	$matches_count = preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body, $matches);
 
 	return $matches_count;
 
