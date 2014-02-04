@@ -9,13 +9,13 @@ jQuery(document).ready(function ($) {
 
 		adminmenu.find('.wp-menu-image img[src ~= font-class]').each(function(){
 			$(this).hide();
-			var font_class= $(this).attr('src').replace('font-class', '');
-			$(this).parent().addClass(font_class);
+			var font_class = $(this).attr('src').replace('font-class', '');
+			$(this).parent().addClass(font_class).addClass("fa");
 
 			var pod_type = $(this).closest('li').attr('id');
 			console.log(pod_type);
 
-			$('body.' + pod_type + ' #icon-edit-pages').addClass(font_class);
+			$('body.' + pod_type + ' #icon-edit-pages').addClass(font_class).addClass("fa");
 
 			$(this).remove();
 		});

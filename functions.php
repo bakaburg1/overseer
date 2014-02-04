@@ -11,12 +11,12 @@ if (WP_DEBUG) {
 }
 */
 
-ini_set('log_errors', 'off');      // log to file (yes)
+ini_set('log_errors', 'on');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
-require_once( 'deps/wp-less/wp-less.php' );
+//require_once( 'deps/wp-less/wp-less.php' );
 
 bk1_debug::state_set('off');
 bk1_debug::print_always_set('on');
@@ -100,14 +100,18 @@ function opbg_log_database_status($action){
 
 add_action( 'admin_enqueue_scripts', function() {
 	global $pagenow;
+	$WPLessPlugin = WPLessPlugin::getInstance();
+
+	bk1_debug::log('enqueuing');
 
 	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
-	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css' );
+	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css' );
 	wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', array('jquery'), false, true);
 
 	if($pagenow === 'index.php'){
 		bk1_debug::log('enqueuing admin_dashboard.js');
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
+		wp_enqueue_script('datepicker', 'http:////cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.3.0/js/bootstrap-datepicker.min.js', array('jquery'), false, true);
 	}
 
 
@@ -141,6 +145,8 @@ add_action( 'admin_enqueue_scripts', function() {
 		);
 
 	}
+
+	$WPLessPlugin->processStylesheets();
 
 });
 
