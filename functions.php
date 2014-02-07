@@ -18,7 +18,7 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 //require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
+bk1_debug::state_set('on');
 bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
@@ -104,14 +104,14 @@ add_action( 'admin_enqueue_scripts', function() {
 
 	bk1_debug::log('enqueuing');
 
-	wp_enqueue_style( 'opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
-	wp_enqueue_style( 'font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css' );
+	wp_enqueue_style('opgb-admin-style', get_stylesheet_directory_uri().'/style/admin-style.less' );
+	wp_enqueue_style('font-awesome', 'http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css' );
 	wp_enqueue_script('opbg_admin', get_stylesheet_directory_uri().'/js/admin.js', array('jquery'), false, true);
 
 	if($pagenow === 'index.php'){
 		bk1_debug::log('enqueuing admin_dashboard.js');
 		wp_enqueue_script('admin_dashboard', get_stylesheet_directory_uri().'/js/admin_dashboard.js', array('opbg_admin'), false, true);
-		wp_enqueue_script('datepicker', 'http:////cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.3.0/js/bootstrap-datepicker.min.js', array('jquery'), false, true);
+		wp_enqueue_script('moment', 'http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.5.1/moment.min.js', array('jquery'), false, true);
 	}
 
 
@@ -233,6 +233,7 @@ add_filter( 'heartbeat_received', function($response, $data){
 add_action( 'wp_insert_post', function($post_id, $post){
 	bk1_debug::log('wp_insert_post called!');
 	bk1_debug::log('post id: '.$post_id.' and title: '.$post->post_title);
+	bk1_debug::log($post);
 	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
 	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
 	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
@@ -358,10 +359,10 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 		update_option('alexa_out_resources', 0);
 	}
 
-	elseif ($_REQUEST['button_id'] === 'status-period-toggle') {
+	elseif ($_REQUEST['button_id'] === 'get-dashboard-summary') {
 		bk1_debug::log('period change toggled');
 
-		$status = opbg_get_resource_summary(false, $_REQUEST['message'] === month ? true : false);
+		$status = opbg_get_resource_summary(false, $_REQUEST['message'] ? $_REQUEST['message'] : 'total');
 
 		$success = true;
 	}
@@ -475,13 +476,21 @@ add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
 /**** PODS FUNCTIONS ****/
 
 // Get a summary of resurces for every topic
-function opbg_get_resource_summary($sorted_by = false, $last_month = false ){
+function opbg_get_resource_summary($sorted_by = false, $period){
 
 	$resources 	= pods('resources');
 
 	$response 	= array();
 
-	if ($last_month === true) $start = date("Y-m-01");
+	if ($period !== "total"){
+		$period = explode(' ', $period);
+
+		$from = $period[0];
+		$to = $period[1];
+	}
+	else $period = false;
+
+	bk1_debug::log($period);
 
 	if ($sorted_by != false):
 		$taxonomy = pods($sorted_by, array('limit' => -1));
@@ -501,7 +510,6 @@ function opbg_get_resource_summary($sorted_by = false, $last_month = false ){
 					$stats['categorized'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 2) ) )->total_found();
 
 					$stats['excluded'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
-
 				}
 				else {
 					$stats['new'] = $stats['categorized'] = $stats['excluded'] = $stats['total'];
@@ -510,17 +518,22 @@ function opbg_get_resource_summary($sorted_by = false, $last_month = false ){
 
 			endwhile;
 		endif;
-	elseif ($last_month === true):
-		bk1_debug::log('generating resource summary this month');
-		$response['total'] = $resources->find(array('where' => "pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+	elseif ($period !== false):
+		bk1_debug::log('generating resource summary by range:');
 
-		$response['new'] = $resources->find(array('where' => "status = 1 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+		$date_query = "pub_time >= \"$from\" AND pub_time < \"$to\"";
 
-		$response['categorized'] = $resources->find(array('where' => "status = 2 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+		bk1_debug::log($date_query);
 
-		$response['excluded'] = $resources->find(array('where' => "status = 0 AND pub_time >= DATE_FORMAT(NOW() ,'%Y-%m-01')", 'expires' => 60) )->total_found();
+		$response['total'] = $resources->find(array('where' => $date_query/*, 'expires' => 60*/) )->total_found();
 
-	elseif ($last_month === false):
+		$response['new'] = $resources->find(array('where' => "status = 1 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
+
+		$response['categorized'] = $resources->find(array('where' => "status = 2 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
+
+		$response['excluded'] = $resources->find(array('where' => "status = 0 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
+
+	elseif ($period === false):
 		bk1_debug::log('generating resource summary total');
 		$response['total'] = $resources->find()->total_found();
 
@@ -530,6 +543,8 @@ function opbg_get_resource_summary($sorted_by = false, $last_month = false ){
 
 		$response['excluded'] = $resources->find(array('where' => "status = 0", 'expires' => 60) )->total_found();
 	endif;
+
+	bk1_debug::log($response);
 
 	return $response;
 }
@@ -796,8 +811,9 @@ function opbg_check_keywords_in_resource($url){
 
 	$matches_count = preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body, $matches);
 
-	return $matches_count;
+	if (!($matches_count >= 1)) bk1_debug::log("No base keywords, site excluded");
 
+	return $matches_count;
 }
 
 ?>

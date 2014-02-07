@@ -133,6 +133,8 @@ jQuery(document).ready(function ($) {
         var $this       = $(this);
         var $callback   = $this.parent().data('toggle-function');
 
+        console.log($this);
+
 		if (opbg[$callback]($this)){
 			$this.siblings().addBack().toggleClass('active');
 		}
@@ -147,4 +149,5 @@ jQuery(document).ready(function ($) {
 			parent.empty();
 		});
 	});
+
 });

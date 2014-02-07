@@ -89,6 +89,10 @@
 			outline: none;
 		}
 	}
+
+	.btn {
+		padding: 6px 0;
+	}
 }
 
 #dashboard_summary {
@@ -202,6 +206,13 @@
 				float: left;
 				margin-right: 10px;
 			}
+			.spinner {
+				position: absolute;
+				display: inline-block;
+				top: 2px;
+				right: -17px;
+				background-size: 14px;
+			}
 		}
 		.status-data-range {
 			opacity: 0;
@@ -216,6 +227,7 @@
 				height: 22px;
 				display: inline-block;
 				font-size: 12px;
+				padding-left: 5px;
 			}
 		}
 		.separator {
@@ -230,7 +242,7 @@
 		.value {
 			font-size: 22px;
 			text-align: right;
-			font-family: Georgia,"Times New Roman","Bitstream Charter",Times,serif;
+			font-family: "Open Sans",sans-serif;
 			&.status-new {
 				color: green;
 			}

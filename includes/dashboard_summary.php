@@ -4,7 +4,7 @@ function build_dashboard_summary(){
 
 	wp_add_dashboard_widget('dashboard_summary', 'Summary', function(){
 
-		$resources = (object)opbg_get_resource_summary(false, true);
+		//$resources = (object)opbg_get_resource_summary(false, true);
 
 		$fetch_status = get_option( 'resources_fetching_status', false );
 
@@ -63,11 +63,11 @@ function build_dashboard_summary(){
 								<button data-toggle-option="total" class="btn btn-default btn-xs active">Total</button>
 								<button data-toggle-option="range" class="btn btn-default btn-xs">Range</button>
 							</div>
-							<i class="fa fa-cog fa-spin hide"></i>
+							<i class="spinner"></i>
 						</div>
 						<div class="status-data-range">
-							<input type="date" class="form-control datepicker-box" placeholder="from">
-							<input type="date" class="form-control datepicker-box" placeholder="to">
+							<input type="date" class="form-control datepicker-box" data-box="from">
+							<input type="date" class="form-control datepicker-box" data-box="to">
 						</div>
 						<div class="status-view-toggle">
 							<div class="btn-group" data-toggle="buttons-radio" data-toggle-function="dashboard_summary_print_status_values">
@@ -78,11 +78,11 @@ function build_dashboard_summary(){
 					</div>
 					<div class="separator"></div>
 					<div class="container">
-						<div class="status-new key">New:</div><div class="status-new value" data-status-value="<?php echo $resources->new ?>"></div>
-						<div class="status-categorized key">Categorized:</div><div class="status-categorized value" data-status-value="<?php echo $resources->categorized ?>"></div>
-						<div class="status-excluded key">Excluded:</div><div class="status-excluded value" data-status-value="<?php echo $resources->excluded ?>"></div>
+						<div class="status-new key">New:</div><div class="status-new value" data-status-value="">--</div>
+						<div class="status-categorized key">Categorized:</div><div class="status-categorized value" data-status-value="">--</div>
+						<div class="status-excluded key">Excluded:</div><div class="status-excluded value" data-status-value="">--</div>
 						<div class="separator"></div>
-						<div class="status-total key">Total:</div><div class="status-total value" data-status-value="<?php echo $resources->total ?>"></div>
+						<div class="status-total key">Total:</div><div class="status-total value" data-status-value="">--</div>
 					</div>
 				</div>
 
