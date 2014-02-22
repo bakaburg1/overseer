@@ -1,0 +1,2 @@
+*/10 * * * * /usr/bin/curl --silent --compressed http://localhost:8888/preconcezionale/fetch_resources
+*/30 * * * * /usr/bin/curl --silent --compressed http://localhost:8888/preconcezionale/assign_social_scores
