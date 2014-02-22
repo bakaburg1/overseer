@@ -1,7 +1,11 @@
 jQuery(document).ready(function ($) {
 
+	/**** GLOBAL VARS INIT ****/
+
 	// Instantiate main object
 	window.opbg = {};
+
+	/**** FUNCTIONS ****/
 
 	// Add classes to admin menu
 	opbg.set_admin_menu_icons = function(){
@@ -114,6 +118,8 @@ jQuery(document).ready(function ($) {
 		}
 	};
 
+	/**** MAIN ****/
+
 	opbg.set_admin_menu_icons();
 
 	if (typeof pods_list_page_data !== 'undefined'  && pods_list_page_data.pods_manage_page_type === 'list'){
@@ -127,6 +133,8 @@ jQuery(document).ready(function ($) {
             $(this).html('<a href="' + url + '" target="_blank">' + url + '</a>');
         });
     }
+
+    /**** EVENTS HANDLERS ****/
 
     // Implement automatic function calling on radio button toggle
 	$(".bootstrap-wpadmin .btn-group[data-toggle='buttons-radio']").on('click.button-toggle-radio', 'button:not(.disabled):not(.active)', function(){
