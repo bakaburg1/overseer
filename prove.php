@@ -18,103 +18,47 @@
 
 	ini_set('log_errors', 'on');      // log to file (yes)
 	ini_set('display_errors', 'on'); // log to screen (no)
+	//add_filter( 'wp_feed_cache_transient_lifetime', create_function( '$a', 'return 1;' ));
 
-/*
+	$keys_in = 'farmac*, fenobarbital?, barbitur*, valpro*, carbamazepin?, ace-inibitor*, chemio-terap*, radio-terap*, retinoid*, talidomide, anti-depressiv?, anti-?pilett*, farmac* epiless*, anti-tumoral?, benzo-diazepin?, corticosteroid*, farmac* antinfiammator*), farmac* anti-infiammator*, antibiotic?, antifung*, immuno-soppressor*, ergot*, metimazol?, tiamazol?, paroxetin?';
+	$keys_out = '"sono incinta", contracce*, anticoncezional?, ticket, farmacia, preservativ?, dermatolog*, "pillola del giorno dopo", sexy';
+	$basekeys = pods('opbg_database_settings')->field('keys_base');
+	//var_dump($query);
 
-	$resources = pods('resources')->find(array('limit' => 20));
+	$sites = array(
+		'http://forum.pianetamamma.it/nascera-nel-mese-di/130473-mamme-di-agosto-2014-a-146.html#post2740954',
+		'http://www.nostrofiglio.it/gravidanza/salute-benessere/Escherichia-coli-cistite-in-gravidanza.html',
+		'http://news.supermoney.eu/salute/2014/02/influenza-2014-picco-sintomi-soggetti-a-rischio-cure-con-rimedi-naturali-0065688.html',
+		'http://www.ilgossip.net/le-cause-dei-giramenti-di-testa-nelle-donne-e-quali-terapie-sono-efficaci-2-48087.html',
+		'http://www.tempi.it/diminuiscono-gli-aborti-ma-aumentano-quelli-con-la-ru486-e-quelli-clandestini',
+		'http://www.assicuriamocibene.it/2014/02/17/le-prescrizioni-farmacologiche-per-finalita-diverse-da-quelle-indicate-nel-bugiardino-sono-lecite/',
+		'http://www.wdonna.it/emorroidi-cura-e-prevenzione/41355'
+		);
 
-	$reload = 0;
 
-	echo "<div class='total'>".$resources->total_found()."</div>";
+ /*$sites[0] = "http://www.comedonchisciotte.org/site/modules.php?file=viewtopic&name=Forums&t=68001";
 
-	while($resources->fetch()){
-		$url = $resources->field('url');
-		$alexa_rank = ($resources->field('source.alexa') === '' OR  $resources->field('source.alexa') === null OR $resources->field('source.alexa') === false) ? false : (int)$resources->field('source.alexa');
-		$keywords = (int)$resources->field('keywords_matched');
+	foreach ($sites as $site) {
+		var_dump($site);
+		$parsed = opbg_parse_text_with_query(opbg_load_resource_body(array('url'=> $site)), $basekeys);
+		var_dump($parsed);
 
-		//echo "$url\t$alexa\t$keywords\n";
-		//var_dump($resources->field('source.alexa'));
-		//var_dump($alexa_rank);
+		$parsed = opbg_parse_text_with_query(opbg_load_resource_body(array('url'=> $site)), $keys_in);
+		var_dump($parsed);
 
-		if ($alexa_rank > pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank === 0) {
-			$resources->delete();
-			echo "Alexa score $alexa_rank, deleting\n";
-			$reload = 1;
-			continue;
-		}
+		$parsed = opbg_parse_text_with_query(opbg_load_resource_body(array('url'=> $site)), $keys_out);
+		var_dump($parsed);
+	}*/
 
-		if ($keywords === 0){
-			echo "$keywords keywords found";
+	echo pods('resources')->find(array('where' => 'social_scores IS NULL'))->total_found()."\n";
 
-			$matches = opbg_check_keywords_in_resource($url);
-
-			if ($matches >= 1){
-				$resources->save('keywords_matched', $matches);
-				echo ",$matches present, updating\n";
-			}
-			else {
-				$resources->delete();
-				echo ", deleting\n";
-				$reload = 1;
-			}
-			continue;
-		}
+	$ress = pods('resources')->find(array('where' => 'social_scores IS false'));
+	
+	var_dump($ress->total_found());
+	
+	while($ress->fetch()){
+		var_dump($ress->field('social_scores'));
 	}
-
-*/
-
-	$sources = pods('sources', array('limit' => 30, "where" => "(resources.id IS NULL) OR (t.alexa NOT BETWEEN 1 AND 120000) OR (t.url IS NULL)"));
-
-	//$sources = pods('sources', array('limit' => 15, "where" => "(resources.id IS NULL)"));
-
-	echo "<div class='total'>".$sources->total_found()."</div>";
-
-	$total = $sources->total_found();
-
-	//echo "url\tresources\talexa\n";
-
-	while($sources->fetch()){
-		$url = $sources->field('url');
-		$resources = count($sources->field('resources'));
-		$alexa = $sources->field('alexa');
-
-		//echo "$url\t$resources\t$alexa\n";
-
-		$sources->delete();
-
-		//var_dump($sources->field('resources'));
-	}
-
-	?>
-
-
+?>
 </pre>
-<?php echo $sources->pagination( array( 'type' => 'paginate' ) ); ?>
-<script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
-
-<script type="text/javascript">
-jQuery(document).ready(function ($) {
-
-	//link = $('.pods-pagination-paginate .next').attr('href');
-
-	console.log($('.total').text() !== "0");
-	console.log($('.reload').eq(0).text() === "1");
-
-	//reload = <?php echo $reload ?>;
-
-	//return false;
-
-	$total = <?php echo $total ?>;
-
-	if ($total !== 0) {
-
-		window.location = window.location
-
-		//if (reload === 1) window.location = window.location;
-		//else window.location = link;
-	}
-
-});
-
-</script>
 stop
