@@ -7,15 +7,20 @@
  * @subpackage Overseer
  *
  */
-$resources_time_range = 'pub_time > "2013-11-01"';
+/*$resources_time_range = 'pub_time > "2014-01-01"';
 
 $resources = pods('resources')->find(array('where' => $resources_time_range));
 
-echo 'Total pages november: '.$resources->total_found()."<br>";
+echo 'Total pages january: '.$resources->total_found()."<br>";*/
 
-$resources_time_range = 'pub_time > "2013-11-01" AND pub_time < "2013-12-01"';
+$start_date = "2013-10-01";
+$end_date = "2013-12-31";
 
-$sources_time_range = 't.created > "2013-11-01" AND t.created < "2013-12-01"';
+echo "Report from ".date_create($start_date)->format('d M Y')." to ".date_create($end_date)->format('d M Y')."\n\n";
+
+$resources_time_range = "pub_time >= '$start_date' AND pub_time <= '$end_date'";
+
+$sources_time_range = "t.created >= '$start_date' AND t.created <= '$end_date'";
 
 $resources = pods('resources')->find(array('where' => $resources_time_range));
 
@@ -41,8 +46,10 @@ $prec_and_both = $preconception + $both;
 
 echo 'Pregnancy: '.round($pregnancy/$pertinent * 100).'%; preconception: '.round($preconception/$pertinent * 100).'%; both: '.round($both/$pertinent * 100).'%<br>';
 
-$facebook = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks IN ("Facebook")'))->total_found();
-$twitter = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks IN ("Twitter")'))->total_found();
+echo 'Pages about preconceptional period: '.$prec_and_both."\n";
+
+$facebook = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks = ("Facebook")'))->total_found();
+$twitter = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks = ("Twitter")'))->total_found();
 $gplus = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks = "Google+"'))->total_found();
 $linkedin = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks = "Linkedin"'))->total_found();
 $other_sn = $resources->find(array('where' => $resources_time_range.' AND status = 2 AND context IN (1, 2) AND social_networks = "Others"'))->total_found();
@@ -97,32 +104,31 @@ while($sources->fetch()){
 
 	$source_url = $sources->field('url');
 
-	$source_resources = $sources->field('resources');
+	//$source_resources = $sources->field('resources');
+	
+	$source_resources = pods('resources')->find(array('limit' => -1, "where" => 'source.id = '.$sources->id().' AND is_correct IS NOT NULL'));
 
-	$correct_level = 0;
+	$correctness_level = 0;
 
-	$total = 0;
+	$total_res_for_source = $source_resources->total_found();
+	
+    if ($total_res_for_source > 0) {
+	    while ($source_resources->fetch()) $correctness_level += (int)$source_resources->field('is_correct') / 2;
+    }
 
-	foreach ($source_resources as $resource){
-		if($resource['status'] === '2' AND $resource['type'] !== '1'){
-			//print_r($resource);
+	$correctness_level = $correctness_level / $total_res_for_source;
+	
+	//var_dump($correctness_level);
 
-			$correct_level += (int)$resource['is_correct'] / 2;
+	$sources_by_correctness[] = array('url' => $source_url, 'correctness' => $correctness_level, 'pages' => $total_res_for_source);
 
-			$total++;
-		}
-	}
-
-	$correct_level = $correct_level / count($source_resources);
-
-	$sources_by_correctnes[] = array('url' => $source_url, 'level' => $correct_level, 'total' => $total);
-
+    //var_dump($sources_by_correctness);
 }
 
-usort($sources_by_correctnes, function($a, $b) {
-	if($a['level'] === $b['level']) return 0;
+usort($sources_by_correctness, function($a, $b) {
+	if($a['correctness'] === $b['correctness']) return 0;
 
-	return ($a['level'] > $b['level']) ? -1 : 1;
+	return ($a['correctness'] > $b['correctness']) ? -1 : 1;
 });
 
 //var_dump($sources_by_correctnes);
@@ -130,13 +136,13 @@ usort($sources_by_correctnes, function($a, $b) {
 ?>
 <table>
 	<tr>
-		<th>url</th><th>level</th><th>pages</th>
+		<th>url</th><th>level of correctness</th><th>pages</th>
 	</tr>
 	<?php
 
-	foreach ($sources_by_correctnes as $source){
+	foreach ($sources_by_correctness as $source){
 		echo "<tr>";
-		echo "<td>".$source['url']."</td><td>".round($source['level'] * 100)."%</td><td>".$source['total']."</td>";
+		echo "<td>".$source['url']."</td><td>".round($source['correctness'] * 100)."%</td><td>".$source['pages']."</td>";
 		echo "</tr>";
 	}
 	?>
