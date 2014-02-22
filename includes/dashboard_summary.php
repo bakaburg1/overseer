@@ -63,7 +63,7 @@ function build_dashboard_summary(){
 								<button data-toggle-option="total" class="btn btn-default btn-xs active">Total</button>
 								<button data-toggle-option="range" class="btn btn-default btn-xs">Range</button>
 							</div>
-							<i class="spinner"></i>
+							<i class="spinner hide"></i>
 						</div>
 						<div class="status-data-range">
 							<input type="date" class="form-control datepicker-box" data-box="from">
@@ -80,9 +80,10 @@ function build_dashboard_summary(){
 					<div class="container">
 						<div class="status-new key">New:</div><div class="status-new value" data-status-value="">--</div>
 						<div class="status-categorized key">Categorized:</div><div class="status-categorized value" data-status-value="">--</div>
-						<div class="status-excluded key">Excluded:</div><div class="status-excluded value" data-status-value="">--</div>
+						<div class="status-not-pertinent key">Not Pertinent:</div><div class="status-not-pertinent value" data-status-value="">--</div>
 						<div class="separator"></div>
 						<div class="status-total key">Total:</div><div class="status-total value" data-status-value="">--</div>
+						<div class="status-excluded key">Excluded:</div><div class="status-excluded value" data-status-value="">--</div>
 					</div>
 				</div>
 
