@@ -11,18 +11,19 @@ if (WP_DEBUG) {
 }
 */
 
-ini_set('log_errors', 'on');      // log to file (yes)
+ini_set('log_errors', 'off');      // log to file (yes)
 ini_set('display_errors', 'off'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 //require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('on');
-bk1_debug::print_always_set('on');
+bk1_debug::state_set('off');
+bk1_debug::print_always_set('off');
 
 add_action( 'init', function(){
-	update_option('sampling_threshold', 25);
+	delete_option('sampling_threshold');
+	delete_option('are_new_resources');
 });
 
 /**** UTILITIES ****/
@@ -96,7 +97,225 @@ function opbg_log_database_status($action){
 	}
 }
 
-/* CSS AND JAVASCRIPTS */
+function opbg_parse_page_content($url) {
+
+	$error = true;
+	$parser_api_url = 'http://ftr.fivefilters.org/makefulltextfeed.php?url='.urlencode($url);
+	$i = 0;
+
+	while ($error === true AND $i < 4) {
+		$response = fetch_feed( $parser_api_url );
+
+		if ( !is_wp_error( $response ) ) {
+			$error = false;
+		}
+	}
+
+	if ($error){
+		bk1_debug::log('Fivefilters not reachable.');
+		bk1_debug::log($response);
+		//opbg_add_excluded_resource($item, 5);
+		return false;
+	}
+
+	$content = $response->get_items()[0]->get_description();
+
+	if (preg_match("/\[unable to retrieve full-text content\]/im", $content) > 0) return false;
+
+	bk1_debug::log('Page main content fetched.');
+
+	return $content;
+}
+
+function opbg_get_whole_page($url) {
+
+	$error = true;
+	$i = 0;
+
+	while ($error === true AND $i < 4) {
+		$response = wp_remote_post($url);
+
+		if ( !is_wp_error( $response ) ) {
+		   $error = false;
+		}
+	}
+
+	if ($error){
+		bk1_debug::log('Site not reacheable.');
+		bk1_debug::log($response);
+		//opbg_add_excluded_resource($item, 5);
+		return false;
+	}
+
+	bk1_debug::log('Whole page fetched.');
+
+	return wp_remote_retrieve_body($response);
+}
+
+function opbg_load_resource_body($item)
+{
+	$url = $item['url'];
+	$response = false;
+
+	//var_dump(preg_match_all("/forum|community|answer|consulti/i", $url));
+
+	if (preg_match_all("/forum|community|answer|consulti/i", $url) === 0) $response = opbg_parse_page_content($url);
+	else  $content = opbg_get_whole_page($url);
+
+	if ($response === false) $content = opbg_get_whole_page($url);
+
+	// Super Trim! ©
+	if( $content !== false) $content = preg_replace("/^\s+|\s+$|(?<=\s)\s+/", "", $content);
+
+	//bk1_debug::log($content);
+
+	return $content;
+}
+
+
+function opbg_keywords_to_query($string)
+{
+	// Super Trim! ©
+	$string = preg_replace("/^\s+|\s+$|(?<=\s)\s+/", "", $string);
+
+	if (preg_replace("/\s*/", '', $string) == false) return false;
+
+	bk1_debug::log($string);
+
+	$pieces = preg_split("/,(?!\d+})\s+/", $string);
+
+	$result = array();
+
+	foreach ($pieces as $keyword) {
+
+		$type = 'single';
+
+		$pattern = array();
+
+		$keyword = trim($keyword);
+
+		if (preg_replace("/\s*/", '', $keyword) == false) continue;
+
+		// Check if kywords are multiple and if are quoted or not
+		if (preg_match_all("/\w+/", preg_replace("/[^\w\s]/m", '', $keyword)) > 1) {
+			if (preg_match_all("/^\"|\"$/", $keyword)) $type = "quoted";
+			else $type = "unordered";
+		}
+		$keyword = str_replace('"', '', $keyword);
+		$keyword = preg_replace('/\(|\)/', '', $keyword);
+
+		// Remove \* or \? that followed by other \? or \*, clean other symbols and remove multiple dashes
+		$keyword = preg_replace("/(\?|\*)+(?=\?|\*)|[^-\w\d\s\?\*,{}]|(?<=-)-+/", "", $keyword);
+		// Remove non words separating dashes
+		$keyword = preg_replace("/(?<!\b)-+(?!\b)/", "", $keyword);
+		// Super Trim! ©
+		$keyword = preg_replace("/^\s+|\s+$|(?<=\s)\s+/", "", $keyword);
+
+		$regex = $keyword;
+
+		// Sostitute dashes with loose matching of \s or -
+		$regex = preg_replace('/\b-\b/', '(?:\s|-)?', $keyword);
+
+		// Identify modifiers and Substitute them
+		$regex = preg_replace('/\*|\?(?!:)|(\{\d(?:,\d)?\})/', '[a-zA-Zàèéòù]$0', $regex);
+
+		// if type is unordered, return array
+		if ($type == "unordered"){
+			$splitted = explode(' ', $regex);
+
+			$term["pattern"] = array();
+
+			foreach ($splitted as $word) {
+				$term["pattern"][] = "/(?<=\b|\d)$word(?=\b|\d)/im";
+			}
+		}
+		else $term["pattern"] = "/(?<=\b|\d)$regex(?=\b|\d)/im";
+
+		$term["type"] = $type;
+
+		$result[] = $term;
+	}
+
+	return $result;
+}
+
+function opbg_parse_text_with_query($text, $query){
+	$query = opbg_keywords_to_query($query);
+
+	if ($query == false) return false;
+
+	$text = trim($text);
+	$text = preg_replace("/\s\s+/", " ", $text);
+
+	$results = array();
+
+	foreach ($query as $term) {
+		$buff = array();
+
+		if ($term["type"] !== "unordered") {
+			if (preg_match_all($term["pattern"], $text, $buff) > 0) $results = array_merge($results, $buff[0]);
+		}
+		elseif ($term["type"] === "unordered") {
+			$buff2 = array();
+
+			$are_all_present = false;
+
+			foreach ($term["pattern"] as $pattern) {
+				if (preg_match_all($pattern, $text, $buff2) > 0) {
+					$buff = array_merge($buff, $buff2[0]);
+
+					$are_all_present = true;
+				}
+				else {
+					$are_all_present = false;
+					break;
+				}
+			}
+
+			if ($are_all_present === true) $results = array_merge($results, $buff);
+		}
+
+		//var_dump($results);
+	}
+
+	if (empty($results)) return false;
+
+	$counted = array_count_values($results);
+
+	arsort($counted);
+
+	return $counted;
+}
+
+function opbg_array_to_textfield($keywords) {
+	$result = '';
+
+	foreach ($keywords as $keyword => $matches) {
+		$result .= $keyword.': '.$matches."\n";
+	}
+
+	return $result;
+}
+
+function opbg_get_social_scores_of_url($url) {
+	$response = wp_remote_get( 'http://sharedcount.appspot.com/?url='.rawurlencode($url) );
+
+	$response = json_decode(wp_remote_retrieve_body( $response ));
+
+	bk1_debug::log($response);
+
+	$response = array(
+		'Facebook' => $response->Facebook->total_count,
+		'Twitter' => $response->Twitter,
+		'Google+' => $response->GooglePlusOne,
+		'LinkedIn' => $response->LinkedIn,
+		'total' => $response->Facebook->total_count + $response->Twitter + $response->GooglePlusOne + $response->LinkedIn
+	);
+
+	return opbg_array_to_textfield($response);
+}
+
+/**** CSS AND JAVASCRIPTS ****/
 
 add_action( 'admin_enqueue_scripts', function() {
 	global $pagenow;
@@ -203,47 +422,33 @@ add_filter( 'login_redirect', function($redirect_to, $request, $user){
 	return admin_url().'index.php';
 }, 10, 3);
 
-
-/*add_filter( 'xmlrpc_enabled', function($enabled){
-
-	bk1_debug::log($enabled);
-	return $enabled;
-});*/
-
 add_filter( 'heartbeat_received', function($response, $data){
 	global $pagenow;
+
 	// Make sure we only run our query if the proper key is present
 	//bk1_debug::log('heartbeat_received');
-	if( $pagenow === 'index.php' AND $data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
-		if ( get_option('are_new_resources', false) ){
-			$response['dashboard_summary_data'] = opbg_get_resource_summary();
-			bk1_debug::log('sending resources upgrade');
-			bk1_debug::log($response);
-			update_option('are_new_resources', false);
+	if(@$data['dashboard_heartbeat'] === 'upgrade_dashboard_summary' ) {
+
+		$current_status = opbg_get_resource_summary(false, $data['dashboard_actual_period']);
+
+		$difference = array_diff_assoc($data['dashboard_actual_status'], $current_status);
+
+		bk1_debug::log('Computing data difference:');
+		bk1_debug::log($difference);
+
+		if ( !empty($difference) ) {
+
+			bk1_debug::log('Dashboard is not upgraded!');
+
+			$response['is_database_changed'] = true;
 		}
 	}
 
-	//bk1_debug::log('sending heartbeat response');
+	bk1_debug::log('sending heartbeat response');
 
 	return $response;
 
 }, 10, 2 );
-
-// On post creation through ifttt call post to resource converter
-add_action( 'wp_insert_post', function($post_id, $post){
-	bk1_debug::log('wp_insert_post called!');
-	bk1_debug::log('post id: '.$post_id.' and title: '.$post->post_title);
-	bk1_debug::log($post);
-	bk1_debug::log('has tag ifttt: '.has_tag( 'ifttt', $post));
-	bk1_debug::log('has right status: '.(get_post_status($post_id) !== 'trash'));
-	if ($post->post_type === 'post' AND has_tag( 'ifttt', $post) AND get_post_status($post_id) !== 'trash') {
-		update_option('arrived_ifttt_posts', get_option('arrived_ifttt_posts', 0) + 1);
-		if (get_option( 'resources_fetching_status', false )){
-			opbg_add_new_resource_from_post($post);
-		}
-		wp_delete_post($post_id, true);
-	}
-}, 10, 2);
 
 /**** AJAX ****/
 
@@ -379,14 +584,6 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 
 });
 
-/*
-add_action( 'xmlrpc_call', function($post){
-	$user = wp_get_current_user();
-
-	if (in_array($user->user_login, get_option( 'disabled_xml_rpc_users', $default = false )))
-
-});*/
-
 /**** PODS HOOKS ****/
 
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
@@ -428,9 +625,9 @@ add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
 		return false;
 	}*/
 
-	$resource = pods('resources')->find(array("limit" => -1, 'where' => array('status = 1 AND source.id = '.$id)));
-
 	bk1_debug::log('New blacklist: '.$new_blacklist);
+
+	$resource = pods('resources')->find(array("limit" => -1, 'where' => array('status = 1 AND source.id = '.$id)));
 
 	if ($resource->total() === 0){
 		bk1_debug::log('No uncategorized resources with this source');
@@ -447,25 +644,25 @@ add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
 			$resource->save('status', 0);
 			bk1_debug::log('Whole site is blacklisted');
 		}
-		else{
+		else {
 
 			foreach ($new_blacklist as $path):
 				$path = trim($path);
 
-			if ($path[0] !== '/') $path = '/'.$path;
+				if ($path[0] !== '/') $path = '/'.$path;
 
-			if (substr($path, -1) === '/') $path = substr($path, 0, -1);
+				if (substr($path, -1) === '/') $path = substr($path, 0, -1);
 
-			bk1_debug::log('resource url: '. $resource->field('url'));
-			bk1_debug::log('blacklist url: '. $host.$path);
+				bk1_debug::log('resource url: '. $resource->field('url'));
+				bk1_debug::log('blacklist url: '. $host.$path);
 
-			if (strpos($resource->field('url'), $host.$path) !== false){
-				$resource->save('status', 0);
-				bk1_debug::log('This resource is blacklisted');
-			}
-			else {
-				bk1_debug::log('This resource is safe');
-			}
+				if (strpos($resource->field('url'), $host.$path) !== false){
+					$resource->save('status', 0);
+					bk1_debug::log('This resource is blacklisted');
+				}
+				else {
+					bk1_debug::log('This resource is safe');
+				}
 			endforeach;
 		}
 
@@ -473,14 +670,17 @@ add_action('pods_api_pre_edit_pod_item_sources', function ($pieces, $id){
 
 }, 10, 3);
 
-/**** PODS FUNCTIONS ****/
+/**** DATABASE FUNCTIONS ****/
 
 // Get a summary of resurces for every topic
-function opbg_get_resource_summary($sorted_by = false, $period){
+function opbg_get_resource_summary($sorted_by = false, $period = 'total'){
 
 	$resources 	= pods('resources');
+	$excluded 	= pods('excluded_resources');
 
 	$response 	= array();
+
+	bk1_debug::log('summary period: '.$period);
 
 	if ($period !== "total"){
 		$period = explode(' ', $period);
@@ -489,8 +689,6 @@ function opbg_get_resource_summary($sorted_by = false, $period){
 		$to = $period[1];
 	}
 	else $period = false;
-
-	bk1_debug::log($period);
 
 	if ($sorted_by != false):
 		$taxonomy = pods($sorted_by, array('limit' => -1));
@@ -509,7 +707,7 @@ function opbg_get_resource_summary($sorted_by = false, $period){
 
 					$stats['categorized'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 2) ) )->total_found();
 
-					$stats['excluded'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
+					$stats['not-pertinent'] = $resources->find( array('where' => array($taxonomy_field => $taxonomy->id(), 'status' => 0) ) )->total_found();
 				}
 				else {
 					$stats['new'] = $stats['categorized'] = $stats['excluded'] = $stats['total'];
@@ -521,7 +719,7 @@ function opbg_get_resource_summary($sorted_by = false, $period){
 	elseif ($period !== false):
 		bk1_debug::log('generating resource summary by range:');
 
-		$date_query = "pub_time >= \"$from\" AND pub_time < \"$to\"";
+		$date_query = "pub_time >= \"$from\" AND pub_time <= \"$to\"";
 
 		bk1_debug::log($date_query);
 
@@ -531,17 +729,21 @@ function opbg_get_resource_summary($sorted_by = false, $period){
 
 		$response['categorized'] = $resources->find(array('where' => "status = 2 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
 
-		$response['excluded'] = $resources->find(array('where' => "status = 0 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
+		$response['not-pertinent'] = $resources->find(array('where' => "status = 0 AND ".$date_query/*, 'expires' => 60*/) )->total_found();
+
+		$response['excluded'] = $excluded->find(array('where' => $date_query) )->total_found();
 
 	elseif ($period === false):
 		bk1_debug::log('generating resource summary total');
 		$response['total'] = $resources->find()->total_found();
 
-		$response['new'] = $resources->find(array('where' => "status = 1", 'expires' => 60) )->total_found();
+		$response['new'] = $resources->find(array('where' => "status = 1") )->total_found();
 
-		$response['categorized'] = $resources->find(array('where' => "status = 2", 'expires' => 60) )->total_found();
+		$response['categorized'] = $resources->find(array('where' => "status = 2") )->total_found();
 
-		$response['excluded'] = $resources->find(array('where' => "status = 0", 'expires' => 60) )->total_found();
+		$response['not-pertinent'] = $resources->find(array('where' => "status = 0") )->total_found();
+
+		$response['excluded'] = $excluded->find()->total_found();
 	endif;
 
 	bk1_debug::log($response);
@@ -550,31 +752,42 @@ function opbg_get_resource_summary($sorted_by = false, $period){
 }
 
 /* Checking if resource and source are already existing */
-function opbg_is_resource_existing($resource_data){
+function opbg_is_resource_existing($item){
 	$sources	= pods('sources');
 
 	$resources	= pods('resources');
 
-	$host		= opbg_sanitize_host_url($resource_data['url']);
+	$excluded	= pods('excluded_resources');
+
+	$host		= opbg_sanitize_host_url($item['url']);
 
 	$sources->find(array('limit' => 1, 'where' => array('url' => $host) ) )->fetch();
 
+	$source 	= $sources;
+
 	$alexa_rank = opbg_generate_alexa_score($host);
 
+	bk1_debug::log("Alexa rank: ".$alexa_rank);
+
 	if ($alexa_rank > pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank === 0){
-		bk1_debug::log('Filtered out by alexa score');
-		return false; // The whole site is blacklisted
+		opbg_add_excluded_resource($item, 1);
+		return false; // The site above alexa threshold
+	}
+
+	if ($excluded->find(array('where' => array('url' => $item['url']) ) )->total_found() > 1){
+		bk1_debug::log('Resource already excluded');
+		return false;
 	}
 
 	// If source already exist
-	if ($sources->exists()):
+	if ($source->exists()):
 
-		opbg_assign_alexa_score($sources);
+		$source->save('alexa', $alexa_rank);
 
 		bk1_debug::log('source already exists');
 		//bk1_debug::log($sources->row());
 
-		$blacklisted = trim($sources->field('blacklisted'));
+		$blacklisted = trim($source->field('blacklisted'));
 
 		bk1_debug::log('source blacklisted paths:');
 		bk1_debug::log($blacklisted);
@@ -583,6 +796,7 @@ function opbg_is_resource_existing($resource_data){
 
 			if ($blacklisted === '*'):
 				bk1_debug::log('Whole site is blacklisted');
+				opbg_add_excluded_resource($item, 6);
 				return false; // The whole site is blacklisted
 			else:
 
@@ -597,8 +811,9 @@ function opbg_is_resource_existing($resource_data){
 
 					if (substr($path, -1) === '/') $path = substr($path, 0, -1);
 
-					if (strpos($resource_data['url'], $host.$path) !== false){
+					if (strpos($item['url'], $host.$path) !== false){
 						bk1_debug::log('This page is blacklisted');
+						opbg_add_excluded_resource($item, 6);
 						return false;
 					}
 				}
@@ -608,11 +823,11 @@ function opbg_is_resource_existing($resource_data){
 		endif;
 
 		// Check if resource exist
-		$resources->find(array('limit' => 1, 'where' => array('t.url' => $resource_data['url']) ) )->fetch();
-		$same_url = $resources->exists();
+		$resources->find(array('limit' => 1, 'where' => array('t.url' => $item['url']) ) )->fetch();
+		//$same_url = $resources->exists();
 
-		$resources->find(array('limit' => 1, 'where' => array('t.title' => $resource_data['title']) ) )->fetch();
-		$same_title = $resources->exists();
+		//$resources->find(array('limit' => 1, 'where' => array('t.title' => $item['title']) ) )->fetch();
+		//$same_title = $resources->exists();
 		// If resource already exist, add topic to it and exit
 		if ($resources->exists()):
 
@@ -623,8 +838,8 @@ function opbg_is_resource_existing($resource_data){
 			bk1_debug::log($resources->field('topics.id'));
 			$resource_topics = $resources->field('topics.id');
 			if (is_array($resource_topics)){
-				if (!in_array($resource_data['topics'], $resource_topics)){
-					$resources->add_to('topics', $resource_data['topics']);
+				if (!in_array($item['topics'], $resource_topics)){
+					$resources->add_to('topics', $item['topics']);
 					bk1_debug::log('saving resource under another topic');
 				}
 				else{
@@ -632,51 +847,51 @@ function opbg_is_resource_existing($resource_data){
 				}
 			}
 
-			$source_topics = $sources->field('topics.id');
+			$source_topics = $source->field('topics.id');
 			if (is_array($source_topics)){
-				if (!in_array($resource_data['topics'], $source_topics)){
-					$sources->add_to('topics', $resource_data['topics']);
+				if (!in_array($item['topics'], $source_topics)){
+					$source->add_to('topics', $resource_data['topics']);
 					bk1_debug::log('saving source under another feed');
 				}
 			}
-
 			return false;
 		endif;
 
 		bk1_debug::log('resource is new');
 
 		// Returns id of an already existing source
-		$source_id = $sources->id();
+		$source_id = $source->id();
 
 	else:
 		bk1_debug::log('source doesn\'t exist, creating a new one');
 		// If source doesn't exist, create a new one
-		$source_id = $sources->add(array('url' => $host, 'topics' => $resource_data['topics'], 'is_pertinent' => 0) );
+		update_option( 'saving_source', $host);
+		$source_id = $source->add(array('url' => $host, 'topics' => $item['topics'], 'is_pertinent' => 0, 'alexa' => $alexa_rank) );
+		update_option( 'saving_source', false);
 		bk1_debug::log('source id: '.$source_id);
 		//bk1_debug::log(pods('sources')->fetch($source_id));
-
-		opbg_assign_alexa_score(pods('sources', $source_id));
 
 	endif;
 
 	return $source_id;
 }
 
-// Convert posts to resources
-function opbg_add_new_resource_from_post($post){
+// Convert feed item to resource
+function opbg_add_new_resource_from_feed_item($item){
 
-	bk1_debug::log('converting the post '.$post->post_title);
+	bk1_debug::log('converting the item '.$item['title']);
 
-	$is_filter_active = get_option( 'resource_filtering_status', false );
+	/* Checking the item */
 
 	// Random Sampling
+	$is_filter_active = get_option( 'resource_filtering_status', false );
 	if ($is_filter_active){
 		$max = 10000;
-		if (mt_rand(0, $max) >= get_option( 'sampling_threshold')/100*$max ) {
-			bk1_debug::log('resource filtered out');
+		if (mt_rand(0, $max) >= pods('opbg_database_settings')->field('sampling_threshold')/100*$max ) {
+			bk1_debug::log('resource sampled out');
 			$filtered_out = get_option('filtered_out_resources', 0);
 			update_option( 'filtered_out_resources', ++$filtered_out );
-			wp_delete_post( $post->ID, true );
+			opbg_add_excluded_resource($item, 0);
 			return false;
 		}
 		else {
@@ -685,72 +900,209 @@ function opbg_add_new_resource_from_post($post){
 		}
 	}
 
-	$resources = pods('resources');
+	$item['body'] = opbg_load_resource_body($item);
+	if ($item['body'] === false) return false;
+	bk1_debug::log('loaded body');
 
-	$topics = pods('topics');
+	// Check if base keywords are present
+	$item['keywords_matched'] = opbg_check_base_keywords($item);
+	if ($item['keywords_matched'] === false) return false;
+	bk1_debug::log('Checked base keys');
 
-	$resource_data = array();
+	// Check if topic specific keywords are present
+	$topics_and_keywords = opbg_check_topics_keywords($item);
+	if ($topics_and_keywords === false) return false;
+	bk1_debug::log('Checked topic keys');
 
-	/* IFTTT post data parsing */
+	$item['keywords_matched'] = array_merge($item['keywords_matched'], $topics_and_keywords['keywords']);
 
-	$content = explode("\n", trim(preg_replace("/(<\s*--[\w]*-->)/", "\n$1", html_entity_decode($post->post_content))));
+	//$item['keywords_matched'] = opbg_keywords_frequency_to_string($item['keywords_matched']);
 
-	bk1_debug::log('log post content');
-	bk1_debug::log($content);
+	$item['keywords_matched'] = opbg_array_to_textfield($item['keywords_matched']);
 
-	foreach ($content as $field):
-		$buffer = array();
-		preg_match("/<\s*--(?P<key>[\w]*)-->(?P<value>.*)/", $field, $buffer);
-		$buffer = array_map('trim', $buffer);
-		$resource_data[ $buffer[ 'key' ] ] = $buffer[ 'value' ];
-	endforeach;
-
-	/* Completing other post fields */
-
-	$resource_data['title'] = $post->post_title;
-
-	$resource_data['pub_time'] = date_create($post->post_date)->format('Y-m-d H:i:s');
-
-	$resource_data['status'] = 1;
-
-	// Transform the topic name in it's ID
-	$topics->find(array('where' => array('name' => $resource_data['topics'] )))->fetch();
-	$resource_data['topics'] = $topics->id();
-
-	bk1_debug::log('Resource parsed prior source check');
-	bk1_debug::log($resource_data);
-
-	// Check if keywords are present
-	$resource_data['keywords_matched'] = opbg_check_keywords_in_resource($resource_data['url']);
-	if (!($resource_data['keywords_matched'] >= 1)) return false;
+	$item['topics'] = $topics_and_keywords['topics'];
 
 	// Check the source for duplicated, alexa ranking, blacklisting
-	$resource_data['source'] = opbg_is_resource_existing($resource_data);
+	$item['source'] = opbg_is_resource_existing($item);
+	if ($item['source'] === false) return false;
 
-	if ($resource_data['source'] === false):
-		wp_delete_post( $post->ID, true );
-		bk1_debug::log('resource existing, blacklisted or out of alexa threshold, exiting');
-		return false;
-	endif;
+	bk1_debug::log('Resource not already existing');
+
+	$item['status'] = 1;
+	$item['context'] = false;
+	$item['is_correct'] = false;
+	$item['type'] = false;
+	$item['comments'] = false;
+
+	bk1_debug::log('Resource parsed successfuly!');
+	bk1_debug::log($item['url']);
 
 	/* Save new entry */
+
+	$resources = pods('resources');
+
 	bk1_debug::log('saving resource');
-	if ($resources->add($resource_data)){
+	update_option( 'saving_resource', $item['url']);
+	if ($resources->add($item)){
 		bk1_debug::log('resource saved!');
-		bk1_debug::log($resource_data);
-		update_option( 'are_new_resources', true );
-	}else {
+		pods('opbg_database_settings')->save('last_feed_check', $item['pub_time']);
+		//update_option('is_database_updated', true);
+	} else {
 		bk1_debug::log('resource saving failed!');
 		wp_mail( get_option( 'admin_email' ), get_option( 'blogname' ).': There was a error saving the post into a resource', 'There was a error saving the post into a resource');
 	}
-	wp_delete_post( $post->ID, true );
+	update_option( 'saving_resource', false);
 
 	return true;
 }
 
+function opbg_add_excluded_resource($item, $reason)
+{
+	$excluded_resources = pods('excluded_resources');
+
+	if (!(pods('excluded_resources')->find(array("where" => array("url" => $item['url'])))->total_found() > 0) ) {
+		update_option( 'saving_excluded', $item['url']);
+		$excluded_id = $excluded_resources->add(array(
+				"title" => $item['title'],
+				"pub_time" => $item['pub_time'],
+				"url" => $item['url'],
+				"reason" => $reason
+			)
+		);
+		update_option( 'saving_excluded', false);
+	}
+	else {
+		bk1_debug::log('excluded and duplicated');
+	}
+
+	pods('opbg_database_settings')->save('last_feeds_check', $item['pub_time']);
+
+	bk1_debug::log('excluded url: '.$item['url'].' for reason '.$reason);
+}
+
+function opbg_fetch_feeds_items () {
+
+	//return false;
+
+	if (get_option( 'resources_fetching_status', false ) == false) {
+		bk1_debug("Resource fetching off");
+		return false;
+	}
+
+	$start = microtime(true);
+
+	opbg_clean_incomplete_database_data();
+
+	add_filter( 'wp_feed_cache_transient_lifetime', create_function( '$a', 'return 1;' ));
+
+	$feeds = pods('opbg_database_settings')->field('feed_urls');
+	$last_check = strtotime(pods('opbg_database_settings')->field('last_feeds_check'));
+
+	bk1_debug::log("last check: ".pods('opbg_database_settings')->field('last_feeds_check'));
+
+	$feeds = trim($feeds);
+
+	if ($feeds == false) {
+		bk1_debug::log('no feeds url set');
+		return false;
+	}
+
+	$feeds = explode('\n', $feeds);
+
+	$parsed = array();
+
+	foreach ($feeds as $feed) {
+		$feed = fetch_feed( $feed );
+
+		if ( is_wp_error( $feed ) ) {
+			bk1_debug::log('feed was unreacheable.');
+			return false;
+		}
+
+		$items = $feed->get_items();
+
+		//bk1_debug::log(count($items));
+
+		foreach ($items as $item) {
+
+			//echo "item time: ".$item->get_date('Y-m-d H:i:s')." last check: ".$last_check." Delta: ".(strtotime($item->get_date('Y-m-d H:i:s')) - $last_check)."\n";
+
+			if (strtotime($item->get_date('Y-m-d H:i:s')) >= $last_check) {
+
+				$parsed[$item->get_link()] = array(
+					"url" => $item->get_link(),
+					"title" => $item->get_title(),
+					"excerpt" => $item->get_description(),
+					"pub_time" => $item->get_date('Y-m-d H:i:s')
+				);
+			}
+		}
+	}
+
+	unset($feed);
+
+	if (empty($parsed)) {
+		bk1_debug::log('No new Items');
+		bk1_debug::log('Items fetch execution time: '.(microtime(true) - $start));
+		return false;
+	}
+
+	bk1_debug::log('Parsed: '.count($parsed));
+
+	usort($parsed, function ($a, $b){
+		$el1 = strtotime($a["pub_time"]);
+		$el2 = strtotime($b["pub_time"]);
+
+		if ($el1 == $el2) return 0;
+
+		return ($el1 > $el2) ? 1 : -1;
+	});
+
+	$i = 1;
+
+	foreach ($parsed as $item) {
+
+		bk1_debug::log('Item #'.$i);
+		echo 'Item #'.$i++."\n";
+
+		//var_dump($item);
+
+		opbg_add_new_resource_from_feed_item($item);
+	}
+
+	bk1_debug::log('Items fetch execution time: '.(microtime(true) - $start));
+	echo 'Social scores execution time: '.(microtime(true) - $start)."\n\n";
+}
+
+function opbg_assign_social_score_to_items(){
+
+	$start = microtime(true);
+
+	$resources = pods('resources')->find(array('limit' => -1, "where" => "DATEDIFF(NOW(), pub_time) >= 20 AND social_scores IS NULL"));
+
+	bk1_debug::log("Social scores to be assigned: ".$resources->total_found());
+	echo "Social scores to be assigned: ".$resources->total_found()."\n\n";
+
+	$i = 1;
+
+	if($resources->total() > 0){
+		while($resources->fetch()){
+			$resources->save('social_scores', opbg_get_social_scores_of_url($resources->field('url')));
+
+			bk1_debug::log('Item #'.$i);
+			bk1_debug::log('Item url: '.$resources->field('url'));
+			echo 'Item #'.$i++."\n";
+			echo 'Item url: '.$resources->field('url')."\n";
+		}
+	}
+
+	bk1_debug::log('Social scores execution time: '.(microtime(true) - $start));
+	echo 'Social scores execution time: '.(microtime(true) - $start)."\n\n";
+}
+
 function opbg_assign_alexa_score($source) {
 
-	if (isset($source) AND $source->exist()){
+	if (isset($source) AND $source->exists()){
 
 		$grank = opbg_generate_alexa_score($source->field('url'));
 
@@ -763,9 +1115,7 @@ function opbg_assign_alexa_score($source) {
 		while($sites->fetch()){
 
 			$url = $sites->field('url');
-			$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
-			$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
-
+			$grank = opbg_generate_alexa_score($url);
 			$sites->save('alexa', $grank);
 		}
 	}
@@ -783,37 +1133,100 @@ function opbg_generate_alexa_score($url = false){
 	}
 }
 
-function opbg_check_keywords_in_resource($url){
+function opbg_check_base_keywords($item){
 
-	$error = true;
+	$keys = pods('opbg_database_settings')->field('keys_base');
 
-	$i = 0;
+	if ($keys == false) return false;
 
-	while ($error === true AND $i < 4) {
-		$response = wp_remote_get($url);
+	$matches = opbg_parse_text_with_query($item['body'], $keys);
 
-		$error = isset($response->errors['http_request_failed']);
+	if ($matches === false) {
+		bk1_debug::log("No base keywords, site excluded");
+		opbg_add_excluded_resource($item, 2);
 
-		bk1_debug::log('trial #'.($i+1)."\n");
-
-		$i++;
+		return false;
 	}
 
-	if ($error){
-		bk1_debug::log($response);
-		//var_dump($response);
-		return 0;
-	}
+	bk1_debug::log("Base keywords found:");
+	bk1_debug::log($matches);
 
-	$the_body = wp_remote_retrieve_body($response);
-
-	$matches = array();
-
-	$matches_count = preg_match_all("/gravidanz|preconcezional|prenatal|concepimento/i", $the_body, $matches);
-
-	if (!($matches_count >= 1)) bk1_debug::log("No base keywords, site excluded");
-
-	return $matches_count;
+	return $matches;
 }
+
+function opbg_check_topics_keywords($item){
+	$topics_pod = pods('topics', array("limit" => -1));
+
+	$topics_found = false;
+	$exclusion_found = false;
+
+	$keywords   = array();
+	$exclusion_keys = array();
+	$topics     = array();
+
+	while($topics_pod->fetch()){
+		$keys_in	= $topics_pod->field("keys_in");
+		$keys_out	= $topics_pod->field("keys_out");
+
+		$matches_in  = opbg_parse_text_with_query($item['body'], $keys_in);
+		$matches_out = opbg_parse_text_with_query($item['body'], $keys_out);
+
+		if ( $matches_out == false ) {
+			if ( $matches_in != false ) {
+				$topics_found   = true;
+				$keywords       = array_merge($keywords, $matches_in);
+				$topics[]       = $topics_pod->id();
+			}
+		}
+		else {
+
+			$exclusion_found = true;
+			$exclusion_keys = array_merge($exclusion_keys, $matches_out);
+		}
+	}
+
+	if ($topics_found === false) {
+		if ($exclusion_found === true) {
+			bk1_debug::log("Exclusion keywords found:");
+			bk1_debug::log($exclusion_keys);
+			opbg_add_excluded_resource($item, 4);
+		}
+		else {
+			bk1_debug::log("No topics found:");
+			opbg_add_excluded_resource($item, 3);
+		}
+
+		return false;
+	}
+
+	bk1_debug::log("topics keywords found:");
+	bk1_debug::log($keywords);
+
+	return array("keywords" => $keywords, "topics" => $topics);
+}
+
+function opbg_clean_incomplete_database_data(){
+	$resource_url = get_option( 'saving_resource', false);
+	if ($resource_url === false) {
+		bk1_debug::log('Cleaning incomplete resource');
+		pods('resources')->find(array('where' => array('url' => $resource_url) ))->delete();
+		update_option( 'saving_resource', false);
+	}
+
+	$source_url = get_option( 'saving_source', false);
+	if ($source_url === false) {
+		bk1_debug::log('Cleaning incomplete source');
+		pods('sources')->find(array('where' => array('url' => $source_url) ))->delete();
+		update_option( 'saving_source', false);
+	}
+
+	$excluded_url = get_option( 'saving_excluded', false);
+	if ($excluded_url === false) {
+		bk1_debug::log('Cleaning incomplete excluded resource');
+		pods('excluded_resources')->find(array('where' => array('url' => $excluded_url) ))->delete();
+		update_option( 'saving_excluded', false);
+	}
+}
+
 
 ?>
