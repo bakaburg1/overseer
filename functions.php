@@ -2,17 +2,17 @@
 
 /**** SETUP ****/
 
-/*
+
 ini_set('error_reporting', E_ALL & ~E_NOTICE);
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
-  define('WP_DEBUG_DISPLAY', false);
+  define('WP_DEBUG_DISPLAY', true);
 }
-*/
 
-ini_set('log_errors', 'off');      // log to file (yes)
-ini_set('display_errors', 'off'); // log to screen (no)
+
+ini_set('log_errors', 'on');      // log to file (yes)
+ini_set('display_errors', 'on'); // log to screen (no)
 
 require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
@@ -118,7 +118,11 @@ function opbg_parse_page_content($url) {
 		return false;
 	}
 
-	$content = $response->get_items()[0]->get_description();
+	$items = $response->get_items();
+
+	$item = $items[0];
+
+	$content = $items->get_description();
 
 	if (preg_match("/\[unable to retrieve full-text content\]/im", $content) > 0) return false;
 
