@@ -10,7 +10,6 @@ if (WP_DEBUG) {
   define('WP_DEBUG_DISPLAY', true);
 }
 
-
 ini_set('log_errors', 'on');      // log to file (yes)
 ini_set('display_errors', 'on'); // log to screen (no)
 
