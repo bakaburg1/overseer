@@ -3,7 +3,7 @@
 /**** SETUP ****/
 
 
-ini_set('error_reporting', E_ALL & ~E_NOTICE);
+ini_set('error_reporting', E_ALL ^ (E_NOTICE | E_WARNING));
 define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);

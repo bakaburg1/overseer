@@ -1,4 +1,0 @@
-[submodule "bk1-wp-utils"]
-	path = deps/bk1-wp-utils
-	url = git@github.com:bakaburg1/bk1-wp-utils.git
-
