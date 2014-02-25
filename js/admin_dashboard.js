@@ -83,7 +83,7 @@ jQuery(document).ready(function ($) {
 		dashboard_summary_widget.find('.status-table .value').each(function(){
 			var $this = $(this);
 			var new_val;
-			if (mode == '%' && !$(this).hasClass('status-total')){
+			if (mode == '%' && !($(this).hasClass('status-total') || $(this).hasClass('status-excluded'))){
 				if (dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') !== 0) {
 					new_val = Math.round( ($this.data('status-value') / dashboard_summary_widget.find('.status-table .status-total.value').data('status-value') * 1000) ) / 10;
 				}
@@ -121,6 +121,8 @@ jQuery(document).ready(function ($) {
 		if (pressed_button === "range"){
 			dashboard_summary_widget.find('.status-data-range').addClass('show');
 			dashboard_summary_widget.find('.status-period-toggle button').toggleClass('active');
+
+			dashboard_summary_widget.find('.status-data-range .datepicker-box').trigger('change.datepicker');
 		}
 		else {
 			dashboard_summary_widget.find('.status-data-range').removeClass('show');
