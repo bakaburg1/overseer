@@ -55,6 +55,11 @@ jQuery(document).ready(function ($) {
 				fields_to_change = 'status';
 				new_value = 0;
 
+				$('.pods-fields-keywords_matched span, .pods-fields-social_scores span').each(function(){
+					var text = $(this).text();
+					var converted = text.replace(/(\d+)\s+/g, "$1<br>");
+					$(this).html(converted);
+				});
 			}
 
 			if (pods_list_page_data.current_pods === 'sources'){
