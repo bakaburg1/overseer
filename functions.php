@@ -4,7 +4,7 @@
 
 
 ini_set('error_reporting', E_ALL ^ (E_NOTICE | E_WARNING));
-define('WP_DEBUG', true);
+//define('WP_DEBUG', true);
 if (WP_DEBUG) {
   define('WP_DEBUG_LOG', true);
   define('WP_DEBUG_DISPLAY', true);
@@ -17,12 +17,13 @@ require_once( 'deps/bk1-wp-utils/bk1-wp-utils.php' );
 //require_once( 'deps/SEOstats/src/seostats.php' );
 //require_once( 'deps/wp-less/wp-less.php' );
 
-bk1_debug::state_set('off');
-bk1_debug::print_always_set('off');
+bk1_debug::state_set('on');
+bk1_debug::print_always_set('on');
 
 add_action( 'init', function(){
 	delete_option('sampling_threshold');
 	delete_option('are_new_resources');
+	delete_option('resource_filtering_status');
 });
 
 /**** UTILITIES ****/
@@ -74,7 +75,7 @@ function opbg_log_database_status($action){
 		'action_performed'      => $action,
 		'date'                  => date('r'),
 		'fetching_status'       => get_option( 'resources_fetching_status', false),
-		'sampling_status'      	=> get_option( 'resource_filtering_status', false),
+		'sampling_status'      	=> get_option( 'sampling_filtering_status', false),
 		'sampling_threshold'	=> pods('opbg_database_settings')->field('sampling_threshold'),
 		'sampled_in_resources'	=> get_option( 'sampled_in_resources', 0),
 		'sampled_out_resources'	=> get_option( 'sampled_out_resources', 0),
@@ -121,7 +122,7 @@ function opbg_parse_page_content($url) {
 
 	$item = $items[0];
 
-	$content = $items->get_description();
+	$content = $item->get_description();
 
 	if (preg_match("/\[unable to retrieve full-text content\]/im", $content) > 0) return false;
 
@@ -158,14 +159,14 @@ function opbg_get_whole_page($url) {
 function opbg_load_resource_body($item)
 {
 	$url = $item['url'];
-	$response = false;
 
 	//var_dump(preg_match_all("/forum|community|answer|consulti/i", $url));
 
-	if (preg_match_all("/forum|community|answer|consulti/i", $url) === 0) $response = opbg_parse_page_content($url);
-	else  $content = opbg_get_whole_page($url);
+	if (preg_match("/forum|community|answer|consulti/i", $url) > 0 OR ($content = opbg_parse_page_content($url)) === false) {
+		$content = opbg_get_whole_page($url);
+	}
 
-	if ($response === false) $content = opbg_get_whole_page($url);
+	//if ($response === false) $content = opbg_get_whole_page($url);
 
 	// Super Trim! ©
 	if( $content !== false) $content = preg_replace("/^\s+|\s+$|(?<=\s)\s+/", "", $content);
@@ -183,7 +184,7 @@ function opbg_keywords_to_query($string)
 
 	if (preg_replace("/\s*/", '', $string) == false) return false;
 
-	bk1_debug::log($string);
+	//bk1_debug::log($string);
 
 	$pieces = preg_split("/,(?!\d+})\s+/", $string);
 
@@ -220,7 +221,7 @@ function opbg_keywords_to_query($string)
 		$regex = preg_replace('/\b-\b/', '(?:\s|-)?', $keyword);
 
 		// Identify modifiers and Substitute them
-		$regex = preg_replace('/\*|\?(?!:)|(\{\d(?:,\d)?\})/', '[a-zA-Zàèéòù]$0', $regex);
+		$regex = preg_replace('/\*|\?(?!:)|(\{\d+(?:,\d+)?\})/', '[a-zA-Zàèéòù]$0', $regex);
 
 		// if type is unordered, return array
 		if ($type == "unordered"){
@@ -305,15 +306,25 @@ function opbg_get_social_scores_of_url($url) {
 
 	$response = json_decode(wp_remote_retrieve_body( $response ));
 
-	bk1_debug::log($response);
+	//var_dump($response);
+
+	$others = 0;
+
+	foreach ($response as $social_netw => $value) {
+		if (!in_array($social_netw, array('Facebook', 'Twitter', 'GooglePlusOne', 'LinkedIn'))) $others += (int)$value;
+	}
 
 	$response = array(
-		'Facebook' => $response->Facebook->total_count,
-		'Twitter' => $response->Twitter,
-		'Google+' => $response->GooglePlusOne,
-		'LinkedIn' => $response->LinkedIn,
-		'total' => $response->Facebook->total_count + $response->Twitter + $response->GooglePlusOne + $response->LinkedIn
+        'Facebook'      => $response->Facebook->total_count != false ? $response->Facebook->total_count : 0,
+        'Twitter'       => $response->Twitter != false ? $response->Twitter : 0,
+        'Google+'       => $response->GooglePlusOne != false ? $response->GooglePlusOne : 0,
+        'LinkedIn'      => $response->LinkedIn != false ? $response->LinkedIn : 0
 	);
+
+    $response['total']      = $response['Facebook'] + $response['Twitter'] + $response['Google+'] + $response['LinkedIn'];
+    $response['others']     = $others;
+
+	bk1_debug::log($response);
 
 	return opbg_array_to_textfield($response);
 }
@@ -436,18 +447,18 @@ add_filter( 'heartbeat_received', function($response, $data){
 
 		$difference = array_diff_assoc($data['dashboard_actual_status'], $current_status);
 
-		bk1_debug::log('Computing data difference:');
-		bk1_debug::log($difference);
+		// bk1_debug::log('Computing data difference:');
+		// bk1_debug::log($difference);
 
 		if ( !empty($difference) ) {
 
-			bk1_debug::log('Dashboard is not upgraded!');
+			//bk1_debug::log('Dashboard is not upgraded!');
 
 			$response['is_database_changed'] = true;
 		}
 	}
 
-	bk1_debug::log('sending heartbeat response');
+	//bk1_debug::log('sending heartbeat response');
 
 	return $response;
 
@@ -592,7 +603,9 @@ add_action( 'wp_ajax_dashboard_widget_control', function(){
 // Check how many categorized resources there are for a source on resource save. If there are zero, the source is labeled as not pertinent and viceversa
 add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, $id){
 
-	$source_id	= pods('resources', $id)->find()->field('source.id');
+	$res	= pods('resources', $id);
+
+	$source_id = $res->field('source.id');
 
 	$source		= pods('sources', $source_id);
 
@@ -606,6 +619,9 @@ add_action('pods_api_post_edit_pod_item_resources', function ($pieces, $is_new, 
 		$source->save('is_pertinent', false);
 	endif;
 
+	if ($res->field('status') === 0 AND $res->field('social_scores') != false) {
+		$res->save('social_scores', false);
+	}
 }, 10, 3);
 
 // If site/page is blacklisted, set all new resources with that url as non pertinent
@@ -683,7 +699,7 @@ function opbg_get_resource_summary($sorted_by = false, $period = 'total'){
 
 	$response 	= array();
 
-	bk1_debug::log('summary period: '.$period);
+	//bk1_debug::log('summary period: '.$period);
 
 	if ($period !== "total"){
 		$period = explode(' ', $period);
@@ -720,11 +736,11 @@ function opbg_get_resource_summary($sorted_by = false, $period = 'total'){
 			endwhile;
 		endif;
 	elseif ($period !== false):
-		bk1_debug::log('generating resource summary by range:');
+		//bk1_debug::log('generating resource summary by range:');
 
 		$date_query = "pub_time >= \"$from\" AND pub_time <= \"$to\"";
 
-		bk1_debug::log($date_query);
+		//bk1_debug::log($date_query);
 
 		$response['total'] = $resources->find(array('where' => $date_query/*, 'expires' => 60*/) )->total_found();
 
@@ -737,7 +753,7 @@ function opbg_get_resource_summary($sorted_by = false, $period = 'total'){
 		$response['excluded'] = $excluded->find(array('where' => $date_query) )->total_found();
 
 	elseif ($period === false):
-		bk1_debug::log('generating resource summary total');
+		//bk1_debug::log('generating resource summary total');
 		$response['total'] = $resources->find()->total_found();
 
 		$response['new'] = $resources->find(array('where' => "status = 1") )->total_found();
@@ -749,7 +765,7 @@ function opbg_get_resource_summary($sorted_by = false, $period = 'total'){
 		$response['excluded'] = $excluded->find()->total_found();
 	endif;
 
-	bk1_debug::log($response);
+	//bk1_debug::log($response);
 
 	return $response;
 }
@@ -767,20 +783,6 @@ function opbg_is_resource_existing($item){
 	$sources->find(array('limit' => 1, 'where' => array('url' => $host) ) )->fetch();
 
 	$source 	= $sources;
-
-	$alexa_rank = opbg_generate_alexa_score($host);
-
-	bk1_debug::log("Alexa rank: ".$alexa_rank);
-
-	if ($alexa_rank > pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank === 0){
-		opbg_add_excluded_resource($item, 1);
-		return false; // The site above alexa threshold
-	}
-
-	if ($excluded->find(array('where' => array('url' => $item['url']) ) )->total_found() > 1){
-		bk1_debug::log('Resource already excluded');
-		return false;
-	}
 
 	// If source already exist
 	if ($source->exists()):
@@ -882,12 +884,12 @@ function opbg_is_resource_existing($item){
 // Convert feed item to resource
 function opbg_add_new_resource_from_feed_item($item){
 
-	bk1_debug::log('converting the item '.$item['title']);
+	bk1_debug::log('converting the item '.$item['url']);
 
 	/* Checking the item */
 
 	// Random Sampling
-	$is_filter_active = get_option( 'resource_filtering_status', false );
+	$is_filter_active = get_option( 'sampling_filtering_status', false );
 	if ($is_filter_active){
 		$max = 10000;
 		if (mt_rand(0, $max) >= pods('opbg_database_settings')->field('sampling_threshold')/100*$max ) {
@@ -903,10 +905,31 @@ function opbg_add_new_resource_from_feed_item($item){
 		}
 	}
 
+	// Check if the page was already excluded
+	$excluded = pods('excluded_resources');
+	if ($excluded->find(array('where' => array('url' => $item['url']) ) )->total_found() > 0){
+		bk1_debug::log('Resource already excluded');
+		return false;
+	}
+
+	$chronometer_start = microtime(true);
+	// Check if the site is above alexa threshold
+	$alexa_rank = opbg_generate_alexa_score($item['url']);
+	bk1_debug::log("Alexa rank: ".$alexa_rank);
+	if ($alexa_rank >= pods('opbg_database_settings')->field('alexa_threshold') OR $alexa_rank == false){
+		opbg_add_excluded_resource($item, 1);
+		return false; // The site above alexa threshold
+	}
+	bk1_debug::log('Alexa score check execution time: '.(microtime(true) - $chronometer_start));
+
+	$chronometer_start = microtime(true);
+	// Check if the site was reached
 	$item['body'] = opbg_load_resource_body($item);
 	if ($item['body'] === false) return false;
 	bk1_debug::log('loaded body');
+	bk1_debug::log('Remote body fetch execution time: '.(microtime(true) - $chronometer_start));
 
+	$chronometer_start = microtime(true);
 	// Check if base keywords are present
 	$item['keywords_matched'] = opbg_check_base_keywords($item);
 	if ($item['keywords_matched'] === false) return false;
@@ -916,6 +939,7 @@ function opbg_add_new_resource_from_feed_item($item){
 	$topics_and_keywords = opbg_check_topics_keywords($item);
 	if ($topics_and_keywords === false) return false;
 	bk1_debug::log('Checked topic keys');
+	bk1_debug::log('Keywords check execution time: '.(microtime(true) - $chronometer_start));
 
 	$item['keywords_matched'] = array_merge($item['keywords_matched'], $topics_and_keywords['keywords']);
 
@@ -925,11 +949,12 @@ function opbg_add_new_resource_from_feed_item($item){
 
 	$item['topics'] = $topics_and_keywords['topics'];
 
-	// Check the source for duplicated, alexa ranking, blacklisting
-	$item['source'] = opbg_is_resource_existing($item);
+	$chronometer_start = microtime(true);
+	// Check the source for duplicated, blacklisting
+	$item['source'] = opbg_is_resource_existing($item, $alexa_rank);
 	if ($item['source'] === false) return false;
-
 	bk1_debug::log('Resource not already existing');
+	bk1_debug::log('Source check execution time: '.(microtime(true) - $chronometer_start));
 
 	$item['status'] = 1;
 	$item['context'] = false;
@@ -944,6 +969,7 @@ function opbg_add_new_resource_from_feed_item($item){
 
 	$resources = pods('resources');
 
+	$chronometer_start = microtime(true);
 	bk1_debug::log('saving resource');
 	update_option( 'saving_resource', $item['url']);
 	if ($resources->add($item)){
@@ -955,6 +981,8 @@ function opbg_add_new_resource_from_feed_item($item){
 		wp_mail( get_option( 'admin_email' ), get_option( 'blogname' ).': There was a error saving the post into a resource', 'There was a error saving the post into a resource');
 	}
 	update_option( 'saving_resource', false);
+	bk1_debug::log('Item saving excution time: '.(microtime(true) - $chronometer_start));
+	update_option( 'latest-seen-url', $item['url']);
 
 	return true;
 }
@@ -963,20 +991,16 @@ function opbg_add_excluded_resource($item, $reason)
 {
 	$excluded_resources = pods('excluded_resources');
 
-	if (!(pods('excluded_resources')->find(array("where" => array("url" => $item['url'])))->total_found() > 0) ) {
-		update_option( 'saving_excluded', $item['url']);
-		$excluded_id = $excluded_resources->add(array(
-				"title" => $item['title'],
-				"pub_time" => $item['pub_time'],
-				"url" => $item['url'],
-				"reason" => $reason
-			)
-		);
-		update_option( 'saving_excluded', false);
-	}
-	else {
-		bk1_debug::log('excluded and duplicated');
-	}
+	update_option( 'saving_excluded', $item['url']);
+	$excluded_id = $excluded_resources->add(array(
+			"title" => $item['title'],
+			"pub_time" => $item['pub_time'],
+			"url" => $item['url'],
+			"reason" => $reason
+		)
+	);
+	update_option( 'saving_excluded', false);
+	update_option( 'latest-seen-url', $item['url']);
 
 	pods('opbg_database_settings')->save('last_feeds_check', $item['pub_time']);
 
@@ -996,7 +1020,7 @@ function opbg_fetch_feeds_items () {
 
 	opbg_clean_incomplete_database_data();
 
-	add_filter( 'wp_feed_cache_transient_lifetime', create_function( '$a', 'return 1;' ));
+	//add_filter( 'wp_feed_cache_transient_lifetime', create_function( '$a', 'return 1;' ));
 
 	$feeds = pods('opbg_database_settings')->field('feed_urls');
 	$last_check = strtotime(pods('opbg_database_settings')->field('last_feeds_check'));
@@ -1030,7 +1054,7 @@ function opbg_fetch_feeds_items () {
 
 			//echo "item time: ".$item->get_date('Y-m-d H:i:s')." last check: ".$last_check." Delta: ".(strtotime($item->get_date('Y-m-d H:i:s')) - $last_check)."\n";
 
-			if (strtotime($item->get_date('Y-m-d H:i:s')) >= $last_check) {
+			if (strtotime($item->get_date('Y-m-d H:i:s')) >= $last_check AND $item->get_link() !== get_option( "latest-seen-url", '' )) {
 
 				$parsed[$item->get_link()] = array(
 					"url" => $item->get_link(),
@@ -1044,9 +1068,10 @@ function opbg_fetch_feeds_items () {
 
 	unset($feed);
 
-	if (empty($parsed)) {
+	if (!(count($parsed) > 0)) {
 		bk1_debug::log('No new Items');
-		bk1_debug::log('Items fetch execution time: '.(microtime(true) - $start));
+		bk1_debug::log('Execution time: '.(microtime(true) - $start));
+		echo "No new Items\nExecution time: ".(microtime(true) - $start)."\n\n";
 		return false;
 	}
 
@@ -1065,23 +1090,24 @@ function opbg_fetch_feeds_items () {
 
 	foreach ($parsed as $item) {
 
-		bk1_debug::log('Item #'.$i);
-		echo 'Item #'.$i++."\n";
+		bk1_debug::log('Item #'.$i."\n".$item['url']."\n".$item['pub_time']."\n\n");
+		echo 'Item #'.$i++."\n".$item['url']."\n".$item['pub_time']."\n\n";
 
 		//var_dump($item);
-
+		$chronometer_start = microtime(true);
 		opbg_add_new_resource_from_feed_item($item);
+		bk1_debug::log('Item processing excution time: '.(microtime(true) - $chronometer_start));
 	}
 
 	bk1_debug::log('Items fetch execution time: '.(microtime(true) - $start));
-	echo 'Social scores execution time: '.(microtime(true) - $start)."\n\n";
+	echo 'Items fetch execution time: '.(microtime(true) - $start)."\n\n";
 }
 
 function opbg_assign_social_score_to_items(){
 
 	$start = microtime(true);
 
-	$resources = pods('resources')->find(array('limit' => -1, "where" => "DATEDIFF(NOW(), pub_time) >= 20 AND social_scores IS NULL"));
+	$resources = pods('resources')->find(array('limit' => -1, "where" => "DATEDIFF(NOW(), pub_time) >= 20 AND social_scores IS NULL AND status != 0"));
 
 	bk1_debug::log("Social scores to be assigned: ".$resources->total_found());
 	echo "Social scores to be assigned: ".$resources->total_found()."\n\n";
@@ -1090,12 +1116,12 @@ function opbg_assign_social_score_to_items(){
 
 	if($resources->total() > 0){
 		while($resources->fetch()){
-			$resources->save('social_scores', opbg_get_social_scores_of_url($resources->field('url')));
+		    $result = opbg_get_social_scores_of_url($resources->field('url'));
 
-			bk1_debug::log('Item #'.$i);
-			bk1_debug::log('Item url: '.$resources->field('url'));
-			echo 'Item #'.$i++."\n";
-			echo 'Item url: '.$resources->field('url')."\n";
+			$resources->save('social_scores', opbg_get_social_scores_of_url($result));
+
+			bk1_debug::log('Item #'.$i.'Item url: '.$resources->field('url')."\n".$result);
+			echo 'Item #'.$i++."\n".'Item url: '.$resources->field('url')."\n".$result."\n\n";
 		}
 	}
 
@@ -1126,7 +1152,7 @@ function opbg_assign_alexa_score($source) {
 
 function opbg_generate_alexa_score($url = false){
 	if ($url !== false){
-		$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.$url);
+		$xml = simplexml_load_file('http://data.alexa.com/data?cli=10&dat=snbamz&url='.rawurlencode($url));
 		$grank = isset($xml->SD[1]->POPULARITY) ? (int)$xml->SD[1]->POPULARITY->attributes()->TEXT : 0;
 
 		return $grank;
@@ -1209,6 +1235,7 @@ function opbg_check_topics_keywords($item){
 }
 
 function opbg_clean_incomplete_database_data(){
+	bk1_debug::log('Checking if incomplete objects are in database');
 	$resource_url = get_option( 'saving_resource', false);
 	if ($resource_url === false) {
 		bk1_debug::log('Cleaning incomplete resource');
