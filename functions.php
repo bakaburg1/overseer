@@ -321,8 +321,8 @@ function opbg_get_social_scores_of_url($url) {
         'LinkedIn'      => $response->LinkedIn != false ? $response->LinkedIn : 0
 	);
 
-    $response['total']      = $response['Facebook'] + $response['Twitter'] + $response['Google+'] + $response['LinkedIn'];
     $response['others']     = $others;
+    $response['total']      = $response['Facebook'] + $response['Twitter'] + $response['Google+'] + $response['LinkedIn'] + $others;
 
 	bk1_debug::log($response);
 
