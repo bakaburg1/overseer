@@ -302,7 +302,10 @@ function opbg_array_to_textfield($keywords) {
 }
 
 function opbg_get_social_scores_of_url($url) {
-	$response = wp_remote_get( 'http://sharedcount.appspot.com/?url='.rawurlencode($url) );
+	$response = wp_remote_get( 'http://free.sharedcount.com/?url='.rawurlencode($url).'&apikey=a8acebd9469cbae34bae349c5705897bb315e344' );
+	$response = wp_remote_retrieve_body( $response );
+
+	if (preg_match("/(E|e)rror/", $response) !== 0) return false;
 
 	$response = json_decode(wp_remote_retrieve_body( $response ));
 
@@ -311,18 +314,20 @@ function opbg_get_social_scores_of_url($url) {
 	$others = 0;
 
 	foreach ($response as $social_netw => $value) {
-		if (!in_array($social_netw, array('Facebook', 'Twitter', 'GooglePlusOne', 'LinkedIn'))) $others += (int)$value;
+		if (!in_array($social_netw, array('Facebook', 'Twitter', 'GooglePlusOne', 'LinkedIn'))){
+			$others += (int)$value;
+		}
 	}
 
 	$response = array(
-        'Facebook'      => $response->Facebook->total_count != false ? $response->Facebook->total_count : 0,
-        'Twitter'       => $response->Twitter != false ? $response->Twitter : 0,
-        'Google+'       => $response->GooglePlusOne != false ? $response->GooglePlusOne : 0,
-        'LinkedIn'      => $response->LinkedIn != false ? $response->LinkedIn : 0
+		'Facebook'      => $response->Facebook->total_count != false ? $response->Facebook->total_count : 0,
+		'Twitter'       => $response->Twitter != false ? $response->Twitter : 0,
+		'Google+'       => $response->GooglePlusOne != false ? $response->GooglePlusOne : 0,
+		'LinkedIn'      => $response->LinkedIn != false ? $response->LinkedIn : 0
 	);
 
-    $response['others']     = $others;
-    $response['total']      = $response['Facebook'] + $response['Twitter'] + $response['Google+'] + $response['LinkedIn'] + $others;
+	$response['other']     = $others;
+	$response['total']      = $response['Facebook'] + $response['Twitter'] + $response['Google+'] + $response['LinkedIn'] + $others;
 
 	bk1_debug::log($response);
 
@@ -1107,7 +1112,7 @@ function opbg_assign_social_score_to_items(){
 
 	$start = microtime(true);
 
-	$resources = pods('resources')->find(array('limit' => -1, "where" => "DATEDIFF(NOW(), pub_time) >= 20 AND social_scores IS NULL AND status != 0"));
+	$resources = pods('resources')->find(array('limit' => -1, "where" => "DATEDIFF(NOW(), pub_time) >= 20 AND social_scores IS NULL"));
 
 	bk1_debug::log("Social scores to be assigned: ".$resources->total_found());
 	echo "Social scores to be assigned: ".$resources->total_found()."\n\n";
@@ -1116,9 +1121,11 @@ function opbg_assign_social_score_to_items(){
 
 	if($resources->total() > 0){
 		while($resources->fetch()){
-		    $result = opbg_get_social_scores_of_url($resources->field('url'));
+			$result = opbg_get_social_scores_of_url($resources->field('url'));
 
-			$resources->save('social_scores', opbg_get_social_scores_of_url($result));
+			if ($result !== false){
+				$resources->save('social_scores', opbg_get_social_scores_of_url($result));
+			}
 
 			bk1_debug::log('Item #'.$i.'Item url: '.$resources->field('url')."\n".$result);
 			echo 'Item #'.$i++."\n".'Item url: '.$resources->field('url')."\n".$result."\n\n";
